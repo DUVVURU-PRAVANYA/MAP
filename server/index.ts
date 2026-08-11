@@ -95,11 +95,13 @@ app.post('/api/export', (req: Request, res: Response) => {
     }
 
     const exportRows = records.map(r => ({
+      'Financial Year': r.financialYear || '',
       'Customer Number': r.custNum,
       'Customer Name': r.customer,
       'Material Code': r.materialCode,
       'Description': r.description,
       'Bill Date': r.billDate,
+      'Year': r.year || '',
       'Month': r.month,
       'Quarter': r.quarter,
       'Invoice Quantity': r.invQty,

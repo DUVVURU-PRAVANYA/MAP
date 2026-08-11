@@ -5,6 +5,7 @@ import {
   CustomerMetric,
   DataQualitySummary,
   FilterState,
+  FinancialYearMetric,
   KPIMetrics,
   ProductMetric,
   SegmentMetric,
@@ -32,6 +33,10 @@ interface AnalyticsContextType {
   filters: FilterState;
   breadcrumbs: BreadcrumbItem[];
 
+  // Financial Year properties
+  availableFinancialYears: string[];
+  financialYearBreakdown: FinancialYearMetric[];
+
   // Selection state for detail drawers
   selectedProduct: string | null;
   setSelectedProduct: (product: string | null) => void;
@@ -44,6 +49,7 @@ interface AnalyticsContextType {
   uploadExcelFile: (file: File) => Promise<void>;
   loadSampleDataset: () => Promise<void>;
   setFilter: (key: keyof FilterState, value: any) => void;
+  toggleFinancialYearFilter: (fy: string) => void;
   toggleSegmentFilter: (segment: string) => void;
   toggleProductFilter: (product: string) => void;
   toggleCustomerFilter: (customer: string) => void;
@@ -207,9 +213,22 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setActiveView('landing');
   };
 
+  // Available Financial Years
+  const availableFinancialYears = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.financialYear))).filter(Boolean).sort();
+  }, [allRecords]);
+
   // Filter handlers
   const setFilter = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleFinancialYearFilter = (fy: string) => {
+    setFilters(prev => {
+      const exists = prev.financialYears.includes(fy);
+      const nextFYs = exists ? prev.financialYears.filter(f => f !== fy) : [...prev.financialYears, fy];
+      return { ...prev, financialYears: nextFYs };
+    });
   };
 
   const toggleSegmentFilter = (seg: string) => {
@@ -291,6 +310,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Compute Filtered Records
   const filteredRecords = useMemo(() => {
     return allRecords.filter(r => {
+      if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) {
+        return false;
+      }
       if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) {
         return false;
       }
@@ -306,12 +328,52 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           r.customer.toLowerCase().includes(q) ||
           r.description.toLowerCase().includes(q) ||
           r.materialCode.toLowerCase().includes(q) ||
-          r.productSegment.toLowerCase().includes(q);
+          r.productSegment.toLowerCase().includes(q) ||
+          (r.financialYear && r.financialYear.toLowerCase().includes(q));
         if (!matches) return false;
       }
       return true;
     });
   }, [allRecords, filters]);
+
+  // Derived Financial Year Breakdown with YoY Growth Calculation
+  const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
+    const fyMap: Record<string, { sales: number; quantity: number; customers: Set<string>; products: Set<string>; segments: Set<string>; transactions: number }> = {};
+
+    allRecords.forEach(r => {
+      const fy = r.financialYear || 'FY Unknown';
+      if (!fyMap[fy]) {
+        fyMap[fy] = { sales: 0, quantity: 0, customers: new Set(), products: new Set(), segments: new Set(), transactions: 0 };
+      }
+      fyMap[fy].sales += r.saleValue;
+      fyMap[fy].quantity += r.invQty;
+      fyMap[fy].customers.add(r.customer);
+      fyMap[fy].products.add(r.materialCode);
+      fyMap[fy].segments.add(r.productSegment);
+      fyMap[fy].transactions += 1;
+    });
+
+    const sortedFYs = Object.keys(fyMap).sort();
+    return sortedFYs.map((fy, idx) => {
+      const data = fyMap[fy];
+      const prevSales = idx > 0 ? fyMap[sortedFYs[idx - 1]].sales : undefined;
+      let yoyGrowthPct: number | null = null;
+      if (prevSales !== undefined && prevSales > 0) {
+        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+      }
+      return {
+        financialYear: fy,
+        sales: data.sales,
+        quantity: data.quantity,
+        customers: data.customers.size,
+        products: data.products.size,
+        segments: data.segments.size,
+        transactions: data.transactions,
+        prevSales,
+        yoyGrowthPct,
+      };
+    });
+  }, [allRecords]);
 
   // Derived KPI Metrics
   const kpiMetrics = useMemo<KPIMetrics>(() => {
@@ -514,6 +576,8 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         insights,
         filters,
         breadcrumbs,
+        availableFinancialYears,
+        financialYearBreakdown,
         selectedProduct,
         setSelectedProduct,
         selectedCustomer,
@@ -523,6 +587,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         uploadExcelFile,
         loadSampleDataset,
         setFilter,
+        toggleFinancialYearFilter,
         toggleSegmentFilter,
         toggleProductFilter,
         toggleCustomerFilter,

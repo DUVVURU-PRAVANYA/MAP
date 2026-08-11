@@ -7,7 +7,7 @@ export const TimeAnalysis: React.FC = () => {
   const { timeTrends, quarterlyBreakdown } = useAnalytics();
   const [granularity, setGranularity] = useState<'monthly' | 'quarterly'>('monthly');
 
-  // Compute MoM or QoQ % changes
+  // Compute MoM or QoQ % changes sorted in April-March Financial Year order
   const periodDataWithChange = useMemo(() => {
     const rawList = granularity === 'monthly' ? timeTrends : quarterlyBreakdown;
     return rawList.map((item, idx) => {

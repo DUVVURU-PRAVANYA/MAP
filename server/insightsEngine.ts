@@ -6,11 +6,47 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
   }
 
   const insights: BusinessInsight[] = [];
-
-  // 1. Overall Dataset Overview & Concentration Analysis
   const totalSales = records.reduce((sum, r) => sum + r.saleValue, 0);
 
-  // Group by Product Segment
+  // 1. Multi-Financial Year YoY Growth Analysis
+  const fySalesMap: Record<string, { sales: number; quantity: number; transactions: number }> = {};
+  records.forEach(r => {
+    const fy = r.financialYear || 'FY Unknown';
+    if (!fySalesMap[fy]) {
+      fySalesMap[fy] = { sales: 0, quantity: 0, transactions: 0 };
+    }
+    fySalesMap[fy].sales += r.saleValue;
+    fySalesMap[fy].quantity += r.invQty;
+    fySalesMap[fy].transactions += 1;
+  });
+
+  const sortedFYs = Object.keys(fySalesMap).sort();
+  if (sortedFYs.length >= 2) {
+    const prevFY = sortedFYs[sortedFYs.length - 2];
+    const currFY = sortedFYs[sortedFYs.length - 1];
+    const prevSales = fySalesMap[prevFY].sales;
+    const currSales = fySalesMap[currFY].sales;
+
+    if (prevSales > 0) {
+      const yoyPct = Math.round(((currSales - prevSales) / prevSales) * 100);
+      const isGrowth = yoyPct >= 0;
+
+      insights.push({
+        id: 'insight-fy-yoy-growth',
+        type: isGrowth ? 'growth' : 'decline',
+        title: isGrowth ? '📈 Multi-Year Financial Revenue Growth' : '📉 Financial Year Revenue Contraction',
+        observation: `Sales ${isGrowth ? 'increased' : 'decreased'} by ${Math.abs(yoyPct)}% in ${currFY} (₹${(currSales / 100000).toFixed(1)} Lakhs) compared with ${prevFY} (₹${(prevSales / 100000).toFixed(1)} Lakhs).`,
+        question: `Which specific product segments and customer accounts drove the ${Math.abs(yoyPct)}% performance variance between ${prevFY} and ${currFY}?`,
+        severity: isGrowth ? 'success' : 'alert',
+        affectedContext: {
+          period: currFY,
+          salesChangePct: yoyPct,
+        },
+      });
+    }
+  }
+
+  // 2. Overall Segment Contribution Analysis
   const segmentSalesMap: Record<string, number> = {};
   records.forEach(r => {
     segmentSalesMap[r.productSegment] = (segmentSalesMap[r.productSegment] || 0) + r.saleValue;
@@ -26,18 +62,15 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       type: 'top_performer',
       title: '🏆 Leading Product Segment Contribution',
       observation: `The "${topSegName}" segment generates the highest sales value, accounting for ${topSegPct}% (₹${(topSegSales / 100000).toFixed(1)} Lakhs) of total revenue.`,
-      question: `How dependent is total business performance on ${topSegName}, and what diversification strategies should be explored across secondary segments?`,
+      question: `How dependent is total business performance on ${topSegName}, and what expansion strategies should be explored across secondary segments?`,
       severity: 'success',
       affectedContext: {
-        segment: topSegSegName(topSegName),
+        segment: topSegName,
       },
     });
   }
 
-  // Helper for safe context naming
-  function topSegSegName(seg: string) { return seg; }
-
-  // 2. Customer Concentration Analysis (Top 5 customers contribution %)
+  // 3. Customer Revenue Concentration Analysis
   const customerSalesMap: Record<string, number> = {};
   records.forEach(r => {
     customerSalesMap[r.customer] = (customerSalesMap[r.customer] || 0) + r.saleValue;
@@ -53,7 +86,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       id: 'insight-customer-concentration',
       type: 'concentration',
       title: '👥 High Customer Revenue Concentration',
-      observation: `The top 5 customers account for ${top5Pct}% of total sales value. Key customer "${topCustomer}" alone represents ${Math.round((sortedCustomers[0][1] / totalSales) * 100)}% of revenue.`,
+      observation: `The top 5 customers account for ${top5Pct}% of total sales value. Key account "${topCustomer}" represents ${Math.round((sortedCustomers[0][1] / totalSales) * 100)}% of overall revenue.`,
       question: `Which customer contracts are due for review, and what trade promotion incentives can minimize customer churn risk in key accounts?`,
       severity: top5Pct > 50 ? 'warning' : 'info',
       affectedContext: {
@@ -62,7 +95,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
     });
   }
 
-  // 3. Product Performance & Long-Tail Analysis
+  // 4. Top Material Code Performance
   const productSalesMap: Record<string, { description: string; sales: number; segment: string }> = {};
   records.forEach(r => {
     if (!productSalesMap[r.materialCode]) {
@@ -90,7 +123,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
     });
   }
 
-  // 4. Time Trend & Quarterly Shifts Analysis
+  // 5. Quarterly Seasonality & Velocity Shifts
   const quarterSalesMap: Record<string, number> = {};
   records.forEach(r => {
     quarterSalesMap[r.quarter] = (quarterSalesMap[r.quarter] || 0) + r.saleValue;
@@ -103,24 +136,26 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
     const firstQVal = quarterSalesMap[firstQ];
     const lastQVal = quarterSalesMap[lastQ];
 
-    const pctChange = Math.round(((lastQVal - firstQVal) / firstQVal) * 100);
-    const isGrowth = pctChange >= 0;
+    if (firstQVal > 0) {
+      const pctChange = Math.round(((lastQVal - firstQVal) / firstQVal) * 100);
+      const isGrowth = pctChange >= 0;
 
-    insights.push({
-      id: 'insight-quarterly-shift',
-      type: isGrowth ? 'growth' : 'decline',
-      title: isGrowth ? '📈 Quarterly Revenue Expansion' : '📉 Quarterly Revenue Contraction',
-      observation: `Sales ${isGrowth ? 'grew' : 'declined'} by ${Math.abs(pctChange)}% between ${firstQ} (₹${(firstQVal / 100000).toFixed(1)}L) and ${lastQ} (₹${(lastQVal / 100000).toFixed(1)}L).`,
-      question: `Which specific product segments or key accounts drove the ${Math.abs(pctChange)}% ${isGrowth ? 'growth' : 'decline'} in ${lastQ}?`,
-      severity: isGrowth ? 'success' : 'alert',
-      affectedContext: {
-        period: lastQ,
-        salesChangePct: pctChange,
-      },
-    });
+      insights.push({
+        id: 'insight-quarterly-shift',
+        type: isGrowth ? 'growth' : 'decline',
+        title: isGrowth ? '📈 Quarterly Revenue Acceleration' : '📉 Quarterly Revenue Contraction',
+        observation: `Sales ${isGrowth ? 'grew' : 'declined'} by ${Math.abs(pctChange)}% between ${firstQ} (₹${(firstQVal / 100000).toFixed(1)}L) and ${lastQ} (₹${(lastQVal / 100000).toFixed(1)}L).`,
+        question: `Which product lines or regional accounts drove the ${Math.abs(pctChange)}% variance in ${lastQ}?`,
+        severity: isGrowth ? 'success' : 'alert',
+        affectedContext: {
+          period: lastQ,
+          salesChangePct: pctChange,
+        },
+      });
+    }
   }
 
-  // 5. Lowest Performing Segment Alert
+  // 6. Lowest Performing Product Segment Alert
   if (sortedSegments.length > 2) {
     const [worstSegName, worstSegSales] = sortedSegments[sortedSegments.length - 1];
     const worstSegPct = ((worstSegSales / totalSales) * 100).toFixed(1);
@@ -130,7 +165,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       type: 'decline',
       title: '⚠ Underperforming Product Segment',
       observation: `The "${worstSegName}" segment generates only ${worstSegPct}% (₹${(worstSegSales / 100000).toFixed(1)} Lakhs) of total sales value.`,
-      question: `What targeted pricing, packaging, or marketing support is required to revive sales velocity in ${worstSegName}?`,
+      question: `What targeted pricing, packaging, or promotion support is required to revive sales velocity in ${worstSegName}?`,
       severity: 'warning',
       affectedContext: {
         segment: worstSegName,

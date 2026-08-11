@@ -41,6 +41,9 @@ export const OverviewDashboard: React.FC = () => {
     topProducts,
     topCustomers,
     quarterlyBreakdown,
+    availableFinancialYears,
+    financialYearBreakdown,
+    toggleFinancialYearFilter,
     filters,
     setFilter,
     toggleSegmentFilter,
@@ -76,6 +79,7 @@ export const OverviewDashboard: React.FC = () => {
   const SEGMENT_COLORS = ['#0c8de9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
 
   const hasActiveFilters =
+    filters.financialYears.length > 0 ||
     filters.segments.length > 0 ||
     filters.products.length > 0 ||
     filters.customers.length > 0 ||
@@ -113,7 +117,30 @@ export const OverviewDashboard: React.FC = () => {
           <span>Global Search & Filter Controls</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+          {/* Financial Year Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Financial Year</label>
+            <select
+              value={filters.financialYears[0] || ''}
+              onChange={e => {
+                if (e.target.value) {
+                  setFilter('financialYears', [e.target.value]);
+                } else {
+                  setFilter('financialYears', []);
+                }
+              }}
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold text-brand-600 dark:text-brand-400"
+            >
+              <option value="">All Years ({availableFinancialYears.length})</option>
+              {availableFinancialYears.map(fy => (
+                <option key={fy} value={fy}>
+                  {fy}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Search Term */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Search Keywords</label>
@@ -368,6 +395,91 @@ export const OverviewDashboard: React.FC = () => {
           <p className="text-[11px] text-slate-400 mt-1">Average invoice size</p>
         </div>
       </div>
+
+      {/* Multi-Financial Year Performance & YoY Growth Analysis */}
+      {financialYearBreakdown.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-card space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-brand-500" />
+                <span>Financial Year Performance & YoY Growth</span>
+              </h3>
+              <p className="text-xs text-slate-500">April to March financial year comparison with Year-over-Year growth velocity</p>
+            </div>
+            <div className="flex items-center space-x-1">
+              {availableFinancialYears.map(fy => (
+                <button
+                  key={fy}
+                  onClick={() => toggleFinancialYearFilter(fy)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    filters.financialYears.includes(fy)
+                      ? 'bg-brand-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
+                >
+                  {fy}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Financial Year Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {financialYearBreakdown.map(item => {
+              const isSelected = filters.financialYears.length === 0 || filters.financialYears.includes(item.financialYear);
+              return (
+                <div
+                  key={item.financialYear}
+                  onClick={() => toggleFinancialYearFilter(item.financialYear)}
+                  className={`cursor-pointer rounded-xl p-4 border transition-all ${
+                    isSelected
+                      ? 'bg-gradient-to-br from-white to-brand-50/30 dark:from-slate-900 dark:to-brand-950/20 border-brand-300 dark:border-brand-800 shadow-md'
+                      : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-900/60 px-2 py-0.5 rounded-full">
+                      {item.financialYear}
+                    </span>
+                    {item.yoyGrowthPct !== null && item.yoyGrowthPct !== undefined ? (
+                      <span
+                        className={`inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${
+                          item.yoyGrowthPct >= 0
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                            : 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
+                        }`}
+                      >
+                        {item.yoyGrowthPct >= 0 ? '↑' : '↓'} {Math.abs(item.yoyGrowthPct)}% YoY
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-medium">Base Year</span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 space-y-1">
+                    <p className="text-xs text-slate-500 font-medium">Sales Value</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                      {formatCurrency(item.sales)}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block">Inv Quantity</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{item.quantity.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Customers</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{item.customers}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Sales Trend Chart */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">

@@ -75,8 +75,9 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
   const records: SampleRecord[] = [];
   const segments = Object.keys(PRODUCTS_BY_SEGMENT);
 
-  // Financial Year 2025-26: Apr 1, 2025 to Mar 31, 2026
-  const startDate = new Date('2025-04-01');
+  // Multi-Financial Year range: Apr 1, 2023 to Mar 31, 2026 (FY 23-24, FY 24-25, FY 25-26)
+  const startDate = new Date('2023-04-01');
+  const totalDays = 1095; // 3 years
 
   for (let i = 0; i < recordCount; i++) {
     const cust = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
@@ -84,22 +85,24 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     const products = PRODUCTS_BY_SEGMENT[segment];
     const product = products[Math.floor(Math.random() * products.length)];
 
-    // Random date within 365 days
-    const dayOffset = Math.floor(Math.random() * 365);
+    // Random date within 3 financial years (36 months)
+    const dayOffset = Math.floor(Math.random() * totalDays);
     const billDateObj = new Date(startDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
     const yyyy = billDateObj.getFullYear();
     const mm = String(billDateObj.getMonth() + 1).padStart(2, '0');
     const dd = String(billDateObj.getDate()).padStart(2, '0');
     const billDate = `${yyyy}-${mm}-${dd}`;
 
-    const invQty = Math.floor(Math.random() * 45) + 5; // 5 to 50 boxes/cases
+    const invQty = Math.floor(Math.random() * 45) + 5; // 5 to 50 cases
     const qtyInNos = invQty * (Math.floor(Math.random() * 6) + 6); // 6 to 12 items per case
-    // Add seasonal variations or specific customer boosts
+
+    // Apply progressive annual growth factor (e.g. +12% YoY)
+    const yearFactor = yyyy === 2023 ? 0.85 : yyyy === 2024 ? 1.0 : 1.18;
     let priceMultiplier = 1.0;
     if (cust.name === 'Metro Retail Hub' || cust.name === 'Arun Traders') {
       priceMultiplier = 1.25;
     }
-    const saleValue = Math.round(product.basePrice * qtyInNos * priceMultiplier * (0.9 + Math.random() * 0.2));
+    const saleValue = Math.round(product.basePrice * qtyInNos * yearFactor * priceMultiplier * (0.9 + Math.random() * 0.2));
 
     records.push({
       'Cust Num.': cust.num,

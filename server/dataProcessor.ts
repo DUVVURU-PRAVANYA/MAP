@@ -31,6 +31,33 @@ export function parseAndCleanExcel(fileBuffer: Buffer, filename: string): Proces
   return processRawRecords(rawData, filename);
 }
 
+export function calculateFinancialYear(dateObj: Date): { financialYear: string; year: number; month: string; quarter: string } {
+  const yyyy = dateObj.getFullYear();
+  const m = dateObj.getMonth(); // 0-indexed: 0=Jan, 3=Apr, 11=Dec
+
+  let fyStartYear: number;
+  let quarter: string;
+
+  if (m >= 3) {
+    // April (3) to December (11) -> Start of Financial Year
+    fyStartYear = yyyy;
+    if (m >= 3 && m <= 5) quarter = 'Q1';
+    else if (m >= 6 && m <= 8) quarter = 'Q2';
+    else quarter = 'Q3';
+  } else {
+    // January (0) to March (2) -> End of Financial Year
+    fyStartYear = yyyy - 1;
+    quarter = 'Q4';
+  }
+
+  const fyEndYear = fyStartYear + 1;
+  const financialYear = `FY ${fyStartYear}-${fyEndYear.toString().slice(-2)}`;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = `${monthNames[m]} ${yyyy}`;
+
+  return { financialYear, year: yyyy, month, quarter };
+}
+
 export function processRawRecords(rawData: RawSalesRecord[], filename: string): ProcessingResult {
   const originalRecords = rawData.length;
   const cleanRecords: CleanSalesRecord[] = [];
@@ -39,6 +66,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   let duplicatesCount = 0;
   let invalidRecordsCount = 0;
   let missingValuesFixedCount = 0;
+  let quantityMismatchCount = 0;
 
   const seenSignatures = new Set<string>();
   const validationRulesMap: Record<string, DataValidationRule> = {
@@ -51,13 +79,19 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     date_format: {
       id: 'date_format',
       title: 'Date Format Verification',
-      description: 'Validates Bill Date format and range',
+      description: 'Validates Bill Date format and April-March Financial Year derivation',
       status: 'success',
     },
     numeric_fields: {
       id: 'numeric_fields',
       title: 'Numeric Fields Validation',
       description: 'Checks sale value and quantities are valid positive numbers',
+      status: 'success',
+    },
+    quantity_mismatch: {
+      id: 'quantity_mismatch',
+      title: 'Quantity Consistency Check',
+      description: 'Verifies Invoice Quantity matches Sale Qty in nos',
       status: 'success',
     },
     missing_values: {
@@ -93,7 +127,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   rawData.forEach((row, index) => {
     const rowNum = index + 2; // Excel row indexing starting from row 2 (row 1 is header)
 
-    // Extract values with flexible key matching
+    // Extract values with flexible key matching (tolerant of company Excel headers & variations)
     const getVal = (keys: string[]) => {
       for (const k of keys) {
         const foundKey = Object.keys(row).find(rk => rk.trim().toLowerCase() === k.toLowerCase());
@@ -104,14 +138,14 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       return '';
     };
 
-    const custNum = String(getVal(['Cust Num.', 'Customer Number', 'Customer Code', 'Cust No'])).trim();
+    const custNum = String(getVal(['Cust Num.', 'Cust Num', 'Customer Number', 'Customer Code', 'Cust No'])).trim();
     const customer = String(getVal(['Customer', 'Customer Name', 'Cust Name'])).trim();
-    const materialCode = String(getVal(['Material code', 'Item Code', 'Product Code', 'Mat Code'])).trim();
+    const materialCode = String(getVal(['Material code', 'Material Code', 'Item Code', 'Product Code', 'Mat Code'])).trim();
     let description = String(getVal(['Description', 'Material Description', 'Product Description', 'Item Name'])).trim();
     const rawBillDate = getVal(['Bill Date', 'Invoice Date', 'Date']);
-    const rawInvQty = getVal(['Inv. Qty', 'Invoice Qty', 'Invoice Quantity']);
-    const rawSaleVal = getVal(['Sale value (Doc rate)', 'Sale Value', 'Sales Value', 'Amount', 'Total Sales']);
-    const rawSaleQty = getVal(['Sale qty in nos', 'Sale Qty', 'Sales Qty', 'Quantity']);
+    const rawInvQty = getVal(['Inv. Qty', 'Inv Qty', 'Invoice Qty', 'Invoice Quantity']);
+    const rawSaleVal = getVal(['Sale value (Doc rate)', 'Sale Value (Doc rate)', 'Sale Value', 'Sales Value', 'Amount', 'Total Sales']);
+    const rawSaleQty = getVal(['Sale qty in nos', 'Sale Qty in nos', 'Sale Qty', 'Sales Qty', 'Quantity']);
     let productSegment = String(getVal(['Product Segment', 'Segment', 'Category'])).trim();
 
     // Check duplicate
@@ -142,6 +176,11 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       return;
     }
 
+    // Quantity mismatch check
+    if (invQty !== saleQty && Math.abs(invQty - saleQty) > 0.001) {
+      quantityMismatchCount++;
+    }
+
     // Parse date
     let parsedDateObj: Date;
     if (rawBillDate instanceof Date && !isNaN(rawBillDate.getTime())) {
@@ -163,22 +202,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     const dd = String(parsedDateObj.getDate()).padStart(2, '0');
     const isoDate = `${yyyy}-${mm}-${dd}`;
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthLabel = `${monthNames[parsedDateObj.getMonth()]} ${yyyy}`;
-
-    // Compute Quarter (Financial Year basis: Q1 = Apr-Jun, Q2 = Jul-Sep, Q3 = Oct-Dec, Q4 = Jan-Mar)
-    const m = parsedDateObj.getMonth() + 1; // 1-12
-    let quarter = '';
-    let fyYear = yyyy;
-    if (m >= 4 && m <= 6) {
-      quarter = `Q1 FY${(yyyy + 1).toString().slice(-2)}`;
-    } else if (m >= 7 && m <= 9) {
-      quarter = `Q2 FY${(yyyy + 1).toString().slice(-2)}`;
-    } else if (m >= 10 && m <= 12) {
-      quarter = `Q3 FY${(yyyy + 1).toString().slice(-2)}`;
-    } else {
-      quarter = `Q4 FY${yyyy.toString().slice(-2)}`;
-    }
+    const fyDetails = calculateFinancialYear(parsedDateObj);
 
     // Missing handling
     if (!productSegment) {
@@ -197,8 +221,10 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       materialCode: materialCode || 'MAT-GENERIC',
       description,
       billDate: isoDate,
-      month: monthLabel,
-      quarter,
+      month: fyDetails.month,
+      quarter: fyDetails.quarter,
+      year: fyDetails.year,
+      financialYear: fyDetails.financialYear,
       invQty,
       saleValue,
       saleQty,
@@ -220,6 +246,15 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     validationRulesMap.duplicate_records.status = 'warning';
     validationRulesMap.duplicate_records.count = duplicatesCount;
     validationRulesMap.duplicate_records.description = `Detected and cleaned ${duplicatesCount} duplicate record(s)`;
+  }
+
+  if (quantityMismatchCount > 0) {
+    validationRulesMap.quantity_mismatch.status = 'warning';
+    validationRulesMap.quantity_mismatch.count = quantityMismatchCount;
+    validationRulesMap.quantity_mismatch.description = `Quantity mismatch detected: Invoice Quantity and Sale Quantity differ in ${quantityMismatchCount} record(s)`;
+  } else {
+    validationRulesMap.quantity_mismatch.status = 'success';
+    validationRulesMap.quantity_mismatch.description = `Quantity fields are consistent (Invoice Quantity matches Sale Qty in nos)`;
   }
 
   if (missingValuesFixedCount > 0) {

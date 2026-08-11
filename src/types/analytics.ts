@@ -18,14 +18,28 @@ export interface CleanSalesRecord {
   materialCode: string;
   description: string;
   billDate: string; // ISO format YYYY-MM-DD
-  month: string; // e.g. "2025-04" or "Apr 2025"
-  quarter: string; // e.g. "Q1 FY26" or "2025-Q2"
+  month: string; // e.g. "Apr 2025" or "April"
+  quarter: string; // e.g. "Q1 FY26" or "Q1"
+  year: number; // e.g. 2025
+  financialYear: string; // e.g. "FY 2024-25"
   invQty: number;
   saleValue: number;
   saleQty: number;
   productSegment: string;
   isFlagged?: boolean;
   flagReason?: string;
+}
+
+export interface FinancialYearMetric {
+  financialYear: string; // e.g. "FY 2024-25"
+  sales: number;
+  quantity: number; // Inv Qty
+  customers: number;
+  products: number;
+  segments: number;
+  transactions: number;
+  prevSales?: number;
+  yoyGrowthPct?: number | null;
 }
 
 export interface DataValidationRule {

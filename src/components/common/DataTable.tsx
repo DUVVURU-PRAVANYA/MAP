@@ -115,6 +115,12 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
         <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
           <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0">
             <tr>
+              <th onClick={() => handleSort('financialYear')} className="py-3 px-4 cursor-pointer">
+                <div className="flex items-center space-x-1">
+                  <span>Financial Year</span>
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                </div>
+              </th>
               <th onClick={() => handleSort('billDate')} className="py-3 px-4 cursor-pointer">
                 <div className="flex items-center space-x-1">
                   <span>Bill Date</span>
@@ -156,6 +162,11 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {paginated.map((r, i) => (
               <tr key={r.id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <td className="py-3 px-4">
+                  <span className="text-[10px] bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">
+                    {r.financialYear}
+                  </span>
+                </td>
                 <td className="py-3 px-4 font-mono font-medium text-slate-500">{r.billDate}</td>
                 <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">{r.customer}</td>
                 <td className="py-3 px-4">
@@ -168,7 +179,7 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
                 <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-white">
                   ₹{r.saleValue.toLocaleString('en-IN')}
                 </td>
-              </tr>
+                </tr>
             ))}
           </tbody>
         </table>
