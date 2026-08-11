@@ -20,3 +20,12 @@ yarn-error.log*
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Confidential Company Data & Uploads
+*.xlsx
+*.xls
+*.csv
+!public/sample_sales_dashboard_data.xlsx
+company-data/
+uploads/
+
