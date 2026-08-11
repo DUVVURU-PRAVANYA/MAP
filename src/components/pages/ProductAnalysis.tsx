@@ -1,0 +1,337 @@
+import React, { useState, useMemo } from 'react';
+import { Package, Search, Layers, IndianRupee, ShoppingBag, Users, Receipt, ArrowLeftRight, Check, X } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
+import { useAnalytics } from '../../context/AnalyticsContext';
+
+export const ProductAnalysis: React.FC = () => {
+  const {
+    topProducts,
+    filteredRecords,
+    selectedProduct,
+    setSelectedProduct,
+    compareProducts,
+    setCompareProducts,
+    toggleCustomerFilter,
+    setActiveView,
+  } = useAnalytics();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+
+  // Active single product selection (default to top product if none selected)
+  const currentProductDesc = selectedProduct || (topProducts[0] ? topProducts[0].description : '');
+
+  const productMetrics = useMemo(() => {
+    return topProducts.find(p => p.description === currentProductDesc) || topProducts[0];
+  }, [topProducts, currentProductDesc]);
+
+  // Monthly trend for selected product
+  const productMonthlyTrend = useMemo(() => {
+    if (!productMetrics) return [];
+    const map: Record<string, { month: string; sales: number; quantity: number }> = {};
+
+    filteredRecords
+      .filter(r => r.description === productMetrics.description || r.materialCode === productMetrics.materialCode)
+      .forEach(r => {
+        if (!map[r.month]) {
+          map[r.month] = { month: r.month, sales: 0, quantity: 0 };
+        }
+        map[r.month].sales += r.saleValue;
+        map[r.month].quantity += r.saleQty;
+      });
+
+    return Object.values(map);
+  }, [filteredRecords, productMetrics]);
+
+  // Top customers buying selected product
+  const productTopCustomers = useMemo(() => {
+    if (!productMetrics) return [];
+    const map: Record<string, { customer: string; sales: number; quantity: number }> = {};
+
+    filteredRecords
+      .filter(r => r.description === productMetrics.description || r.materialCode === productMetrics.materialCode)
+      .forEach(r => {
+        if (!map[r.customer]) {
+          map[r.customer] = { customer: r.customer, sales: 0, quantity: 0 };
+        }
+        map[r.customer].sales += r.saleValue;
+        map[r.customer].quantity += r.saleQty;
+      });
+
+    return Object.values(map).sort((a, b) => b.sales - a.sales).slice(0, 6);
+  }, [filteredRecords, productMetrics]);
+
+  // Comparative metrics data
+  const comparisonData = useMemo(() => {
+    if (compareProducts.length === 0) return [];
+    return compareProducts.map(pDesc => {
+      const pm = topProducts.find(p => p.description === pDesc);
+      return {
+        description: pDesc,
+        materialCode: pm?.materialCode || 'N/A',
+        segment: pm?.segment || 'N/A',
+        sales: pm?.sales || 0,
+        quantity: pm?.quantity || 0,
+        customerCount: pm?.customerCount || 0,
+        rank: pm?.rank || 0,
+      };
+    });
+  }, [topProducts, compareProducts]);
+
+  const toggleCompareProduct = (pDesc: string) => {
+    if (compareProducts.includes(pDesc)) {
+      setCompareProducts(compareProducts.filter(p => p !== pDesc));
+    } else {
+      if (compareProducts.length >= 4) {
+        alert('You can compare up to 4 products at a time.');
+        return;
+      }
+      setCompareProducts([...compareProducts, pDesc]);
+    }
+  };
+
+  const filteredProductList = topProducts.filter(
+    p =>
+      p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.materialCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.segment.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 pb-12 font-sans">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Product Performance & Comparison</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Deep-dive into individual product SKUs and compare performance</p>
+        </div>
+
+        <button
+          onClick={() => setIsCompareOpen(!isCompareOpen)}
+          className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all ${
+            isCompareOpen || compareProducts.length > 0
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+          }`}
+        >
+          <ArrowLeftRight className="w-4 h-4" />
+          <span>Compare Products ({compareProducts.length})</span>
+        </button>
+      </div>
+
+      {/* Product Comparison View */}
+      {(isCompareOpen || compareProducts.length > 0) && (
+        <div className="bg-indigo-950/40 border border-indigo-800/60 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-indigo-200 flex items-center space-x-2">
+              <ArrowLeftRight className="w-4 h-4 text-indigo-400" />
+              <span>Side-by-Side Product Comparison</span>
+            </h2>
+            {compareProducts.length > 0 && (
+              <button
+                onClick={() => setCompareProducts([])}
+                className="text-xs text-indigo-400 hover:text-indigo-200 underline font-semibold"
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
+
+          {comparisonData.length === 0 ? (
+            <p className="text-xs text-indigo-300">Select products below to add them to comparative matrix.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+              {comparisonData.map(item => (
+                <div key={item.description} className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 relative space-y-2">
+                  <button
+                    onClick={() => toggleCompareProduct(item.description)}
+                    className="absolute top-2 right-2 text-slate-400 hover:text-white p-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  <p className="text-xs font-bold text-white pr-6 truncate">{item.description}</p>
+                  <span className="inline-block text-[10px] bg-slate-800 text-indigo-300 px-2 py-0.5 rounded-full font-mono">
+                    {item.segment}
+                  </span>
+
+                  <div className="space-y-1 pt-2 border-t border-slate-800 text-xs">
+                    <div className="flex justify-between text-slate-300">
+                      <span>Sales Value:</span>
+                      <span className="font-bold text-emerald-400">₹{(item.sales / 100000).toFixed(1)}L</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>Quantity Sold:</span>
+                      <span className="font-bold text-white">{item.quantity.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>Accounts:</span>
+                      <span className="font-bold text-brand-400">{item.customerCount}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>Overall Rank:</span>
+                      <span className="font-bold text-amber-400">#{item.rank}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Grid: Left Selector List & Right Product Detail */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Product Selector */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-4 shadow-card">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search SKU name or code..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full text-xs pl-9 pr-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+
+          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            {filteredProductList.map(prod => {
+              const isSelected = prod.description === currentProductDesc;
+              const isCompared = compareProducts.includes(prod.description);
+
+              return (
+                <div
+                  key={prod.materialCode}
+                  onClick={() => setSelectedProduct(prod.description)}
+                  className={`p-3 rounded-xl cursor-pointer border transition-all flex items-center justify-between ${
+                    isSelected
+                      ? 'bg-brand-50/80 border-brand-500 dark:bg-brand-950/60 dark:border-brand-600 shadow-sm'
+                      : 'bg-slate-50 dark:bg-slate-800/60 border-transparent hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{prod.description}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{prod.segment} • #{prod.rank}</p>
+                  </div>
+
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      ₹{(prod.sales / 100000).toFixed(1)}L
+                    </span>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        toggleCompareProduct(prod.description);
+                      }}
+                      className={`p-1 rounded-md text-[10px] border transition-colors ${
+                        isCompared
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
+                      }`}
+                      title="Compare SKU"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: Selected Product Performance Detail */}
+        {productMetrics ? (
+          <div className="lg:col-span-2 space-y-6">
+            {/* Product Overview Header Card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                  <span className="text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950 px-2.5 py-0.5 rounded-full border border-brand-200 dark:border-brand-800">
+                    {productMetrics.segment}
+                  </span>
+                  <h2 className="text-xl font-black text-slate-900 dark:text-white mt-2">{productMetrics.description}</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Material Code: {productMetrics.materialCode}</p>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-xs font-bold text-amber-500 bg-amber-50 dark:bg-amber-950 px-3 py-1 rounded-full">
+                    Overall Rank #{productMetrics.rank}
+                  </span>
+                </div>
+              </div>
+
+              {/* 4 Product KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                  <p className="text-[11px] text-slate-400 font-medium">Sales Revenue</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                    ₹{(productMetrics.sales / 100000).toFixed(2)} Lakhs
+                  </p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                  <p className="text-[11px] text-slate-400 font-medium">Quantity Sold</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    {productMetrics.quantity.toLocaleString()} units
+                  </p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                  <p className="text-[11px] text-slate-400 font-medium">Buying Accounts</p>
+                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+                    {productMetrics.customerCount} customers
+                  </p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                  <p className="text-[11px] text-slate-400 font-medium">Transactions</p>
+                  <p className="text-lg font-bold text-brand-600 dark:text-brand-400 mt-0.5">
+                    {productMetrics.transactionCount} orders
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Monthly Sales Trend */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">Monthly Velocity Trend</h3>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={productMonthlyTrend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <Area type="monotone" dataKey="sales" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Top Customers for this Product */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-3">Top Key Accounts Buying SKU</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {productTopCustomers.map(tc => (
+                  <div
+                    key={tc.customer}
+                    onClick={() => {
+                      toggleCustomerFilter(tc.customer);
+                      setActiveView('customers');
+                    }}
+                    className="flex justify-between items-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-brand-50/50 cursor-pointer"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">{tc.customer}</p>
+                      <p className="text-[10px] text-slate-400">{tc.quantity.toLocaleString()} units purchased</p>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      ₹{(tc.sales / 100000).toFixed(1)}L
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+};
