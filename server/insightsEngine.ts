@@ -60,9 +60,9 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
     insights.push({
       id: 'insight-top-segment',
       type: 'top_performer',
-      title: '🏆 Leading Product Segment Contribution',
-      observation: `The "${topSegName}" segment generates the highest sales value, accounting for ${topSegPct}% (₹${(topSegSales / 100000).toFixed(1)} Lakhs) of total revenue.`,
-      question: `How dependent is total business performance on ${topSegName}, and what expansion strategies should be explored across secondary segments?`,
+      title: '🏆 Leading Vehicle Segment Contribution',
+      observation: `The "${topSegName}" vehicle segment generates the highest sales value, accounting for ${topSegPct}% (₹${(topSegSales / 100000).toFixed(1)} Lakhs) of total revenue.`,
+      question: `How dependent is total business performance on ${topSegName}, and what expansion strategies should be explored across secondary vehicle segments?`,
       severity: 'success',
       affectedContext: {
         segment: topSegName,
@@ -155,7 +155,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
     }
   }
 
-  // 6. Lowest Performing Product Segment Alert
+  // 6. Lowest Performing Vehicle Segment Alert
   if (sortedSegments.length > 2) {
     const [worstSegName, worstSegSales] = sortedSegments[sortedSegments.length - 1];
     const worstSegPct = ((worstSegSales / totalSales) * 100).toFixed(1);
@@ -163,8 +163,8 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
     insights.push({
       id: 'insight-underperforming-segment',
       type: 'decline',
-      title: '⚠ Underperforming Product Segment',
-      observation: `The "${worstSegName}" segment generates only ${worstSegPct}% (₹${(worstSegSales / 100000).toFixed(1)} Lakhs) of total sales value.`,
+      title: '⚠ Underperforming Vehicle Segment',
+      observation: `The "${worstSegName}" vehicle segment generates only ${worstSegPct}% (₹${(worstSegSales / 100000).toFixed(1)} Lakhs) of total sales value.`,
       question: `What targeted pricing, packaging, or promotion support is required to revive sales velocity in ${worstSegName}?`,
       severity: 'warning',
       affectedContext: {

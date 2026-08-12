@@ -126,7 +126,7 @@ app.post('/api/export', (req: Request, res: Response) => {
       'Invoice Quantity': r.invQty,
       'Sale Value (INR)': r.saleValue,
       'Sale Quantity (Nos)': r.saleQty,
-      'Product Segment': r.productSegment,
+      'Vehicle Segment': r.productSegment,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);

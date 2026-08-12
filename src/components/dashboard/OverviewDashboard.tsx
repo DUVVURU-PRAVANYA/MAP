@@ -625,12 +625,12 @@ export const OverviewDashboard: React.FC = () => {
 
       {/* Grid: Sales by Segment vs Top Products */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales by Product Segment */}
+        {/* Sales by Vehicle Segment */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Sales by Product Segment</h3>
-              <p className="text-xs text-slate-500">Click any segment to cross-filter dashboard</p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Sales by Vehicle Segment</h3>
+              <p className="text-xs text-slate-500">Click any vehicle segment to cross-filter dashboard</p>
             </div>
             <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
               <button
@@ -654,7 +654,7 @@ export const OverviewDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-64 w-full">
+          <div className="h-64 w-full relative z-10">
             <ResponsiveContainer width="100%" height="100%">
               {segmentChartType === 'donut' ? (
                 <RePieChart>
@@ -675,15 +675,60 @@ export const OverviewDashboard: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']}
-                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '0.75rem', color: '#fff', fontSize: '12px' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-xl shadow-2xl z-50 pointer-events-none text-xs space-y-1">
+                            <p className="font-bold text-brand-400 border-b border-slate-800 pb-1">{data.segment}</p>
+                            <p className="text-slate-300 flex justify-between gap-4">
+                              <span>Sales:</span>
+                              <span className="font-mono font-bold text-emerald-400">₹{Number(data.sales).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            </p>
+                            <p className="text-slate-300 flex justify-between gap-4">
+                              <span>Quantity (Inv. Qty):</span>
+                              <span className="font-mono font-bold text-white">{Number(data.quantity).toLocaleString()}</span>
+                            </p>
+                            <p className="text-slate-300 flex justify-between gap-4">
+                              <span>Transactions:</span>
+                              <span className="font-mono text-slate-400">{data.transactionCount || data.transactions || 0}</span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
                 </RePieChart>
               ) : (
                 <BarChart data={segmentBreakdown} layout="vertical">
                   <XAxis type="number" tickFormatter={v => `₹${(v / 100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <YAxis dataKey="segment" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={110} />
-                  <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales']} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-xl shadow-2xl z-50 pointer-events-none text-xs space-y-1">
+                            <p className="font-bold text-brand-400 border-b border-slate-800 pb-1">{data.segment}</p>
+                            <p className="text-slate-300 flex justify-between gap-4">
+                              <span>Sales:</span>
+                              <span className="font-mono font-bold text-emerald-400">₹{Number(data.sales).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            </p>
+                            <p className="text-slate-300 flex justify-between gap-4">
+                              <span>Quantity (Inv. Qty):</span>
+                              <span className="font-mono font-bold text-white">{Number(data.quantity).toLocaleString()}</span>
+                            </p>
+                            <p className="text-slate-300 flex justify-between gap-4">
+                              <span>Transactions:</span>
+                              <span className="font-mono text-slate-400">{data.transactionCount || data.transactions || 0}</span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
                   <Bar
                     dataKey="sales"
                     fill="#0c8de9"

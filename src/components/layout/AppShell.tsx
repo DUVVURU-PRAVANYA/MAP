@@ -65,25 +65,25 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           isSidebarOpen ? 'w-64' : 'w-20'
         }`}
       >
-        {/* Brand Logo */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-white shadow-glow shrink-0">
+        {/* Brand Logo Header */}
+        <div className={`flex items-center h-16 px-3 border-b border-slate-200 dark:border-slate-800 ${isSidebarOpen ? 'justify-between' : 'justify-center space-x-2'}`}>
+          <div className="flex items-center space-x-2.5 overflow-hidden shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-white shadow-glow shrink-0" title="Marketing Analytics Platform">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             {isSidebarOpen && (
-              <div className="truncate">
-                <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
+              <div className="truncate min-w-0">
+                <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-tight truncate">
                   Marketing Analytics
                 </h1>
-                <p className="text-[10px] text-brand-600 dark:text-brand-400 font-medium">Enterprise Intelligence</p>
+                <p className="text-[10px] text-brand-600 dark:text-brand-400 font-medium truncate">Enterprise Intelligence</p>
               </div>
             )}
           </div>
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md"
-            title="Toggle Sidebar"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+            title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
             <Menu className="w-5 h-5" />
           </button>

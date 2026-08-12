@@ -120,7 +120,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   invQty: ['invqty', 'invoiceqty', 'invoicequantity'],
   saleValue: ['salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
   saleQty: ['saleqtyinnos', 'saleqty', 'salesqty', 'quantity'],
-  productSegment: ['productsegment', 'vehiclesegment', 'segment', 'category', 'product'],
+  productSegment: ['segment', 'vehiclesegment', 'productsegment', 'category'],
 };
 
 export function normalizeHeader(str: string): string {
