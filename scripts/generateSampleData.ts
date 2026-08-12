@@ -5,15 +5,7 @@ import path from 'path';
 import fs from 'fs';
 
 interface SampleRecord {
-  'Cust Num.': string;
-  'Customer': string;
-  'Material code': string;
-  'Description': string;
-  'Bill Date': string;
-  'Inv. Qty': number;
-  'Sale value (Doc rate)': number;
-  'Sale qty in nos': number;
-  'Product Segment': string;
+  [key: string]: string | number;
 }
 
 const CUSTOMERS = [
@@ -75,9 +67,9 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
   const records: SampleRecord[] = [];
   const segments = Object.keys(PRODUCTS_BY_SEGMENT);
 
-  // Multi-Financial Year range: Apr 1, 2023 to Mar 31, 2026 (FY 23-24, FY 24-25, FY 25-26)
-  const startDate = new Date('2023-04-01');
-  const totalDays = 1095; // 3 years
+  // Multi-Financial Year range: Apr 1, 2022 to Mar 31, 2026 (FY 2022-23, FY 2023-24, FY 2024-25, FY 2025-26)
+  const startDate = new Date('2022-04-01');
+  const totalDays = 1460; // 4 financial years (48 months)
 
   for (let i = 0; i < recordCount; i++) {
     const cust = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
@@ -85,7 +77,7 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     const products = PRODUCTS_BY_SEGMENT[segment];
     const product = products[Math.floor(Math.random() * products.length)];
 
-    // Random date within 3 financial years (36 months)
+    // Random date within 4 financial years
     const dayOffset = Math.floor(Math.random() * totalDays);
     const billDateObj = new Date(startDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
     const yyyy = billDateObj.getFullYear();
@@ -94,10 +86,10 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     const billDate = `${yyyy}-${mm}-${dd}`;
 
     const invQty = Math.floor(Math.random() * 45) + 5; // 5 to 50 cases
-    const qtyInNos = invQty * (Math.floor(Math.random() * 6) + 6); // 6 to 12 items per case
+    const qtyInNos = invQty; // In company Excel, Inv. Qty and Sale Qty in nos represent identical quantities
 
-    // Apply progressive annual growth factor (e.g. +12% YoY)
-    const yearFactor = yyyy === 2023 ? 0.85 : yyyy === 2024 ? 1.0 : 1.18;
+    // Apply progressive annual growth factor across 4 FYs
+    const yearFactor = yyyy === 2022 ? 0.75 : yyyy === 2023 ? 0.88 : yyyy === 2024 ? 1.02 : yyyy === 2025 ? 1.18 : 1.30;
     let priceMultiplier = 1.0;
     if (cust.name === 'Metro Retail Hub' || cust.name === 'Arun Traders') {
       priceMultiplier = 1.25;
@@ -111,20 +103,20 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
       'Description': product.name,
       'Bill Date': billDate,
       'Inv. Qty': invQty,
-      'Sale value (Doc rate)': saleValue,
-      'Sale qty in nos': qtyInNos,
-      'Product Segment': segment,
+      'Sale value(Doc rate)': saleValue, // Company header variation without space
+      'Sale Qty in nos': qtyInNos,
+      'ProductSegment': segment, // Company header variation without space
     });
   }
 
-  // Inject a few deliberate edge cases for Data Cleaning verification
+  // Inject a few deliberate edge cases for Data Quality audit verification
   // 1. A duplicate row
   if (records.length > 5) {
     records.push({ ...records[2] });
     records.push({ ...records[10] });
   }
 
-  // 2. A row with missing value
+  // 2. A row with missing segment
   records.push({
     'Cust Num.': 'CUST-1099',
     'Customer': 'Apex Store Branch',
@@ -132,9 +124,22 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     'Description': 'Premium Basmati Rice 5kg',
     'Bill Date': '2025-11-15',
     'Inv. Qty': 10,
-    'Sale value (Doc rate)': 22500,
-    'Sale qty in nos': 50,
-    'Product Segment': '', // missing segment
+    'Sale value(Doc rate)': 22500,
+    'Sale Qty in nos': 10,
+    'ProductSegment': '', // missing segment
+  });
+
+  // 3. A deliberate quantity mismatch record for validation audit test
+  records.push({
+    'Cust Num.': 'CUST-1088',
+    'Customer': 'Vanguard Retail Ltd',
+    'Material code': 'MAT-201',
+    'Description': 'Refined Sunflower Oil 1L',
+    'Bill Date': '2025-12-01',
+    'Inv. Qty': 20,
+    'Sale value(Doc rate)': 28000,
+    'Sale Qty in nos': 25, // Genuine quantity mismatch for audit check
+    'ProductSegment': 'Cooking Essentials',
   });
 
   return records;

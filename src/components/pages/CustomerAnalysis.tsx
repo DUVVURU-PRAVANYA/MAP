@@ -4,7 +4,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { useAnalytics } from '../../context/AnalyticsContext';
 
 export const CustomerAnalysis: React.FC = () => {
-  const { topCustomers, filteredRecords, selectedCustomer, setSelectedCustomer, toggleCustomerFilter } = useAnalytics();
+  const { topCustomers, allRecords, filteredRecords, selectedCustomer, setSelectedCustomer, toggleCustomerFilter } = useAnalytics();
   const [searchTerm, setSearchTerm] = useState('');
 
   const activeCustomer = useMemo(() => {
@@ -12,22 +12,64 @@ export const CustomerAnalysis: React.FC = () => {
     return topCustomers.find(c => c.customer === selectedCustomer) || null;
   }, [topCustomers, selectedCustomer]);
 
-  // Monthly trend for selected customer
+  // Customer Performance across Financial Years
+  const customerYearlyBreakdown = useMemo(() => {
+    if (!activeCustomer) return [];
+    const map: Record<string, { sales: number; quantity: number; products: Set<string>; transactions: number }> = {};
+
+    allRecords
+      .filter(r => r.customer === activeCustomer.customer)
+      .forEach(r => {
+        const fy = r.financialYear || 'FY Unknown';
+        if (!map[fy]) {
+          map[fy] = { sales: 0, quantity: 0, products: new Set(), transactions: 0 };
+        }
+        map[fy].sales += r.saleValue;
+        map[fy].quantity += r.invQty;
+        map[fy].products.add(`${r.materialCode}|||${r.description}`);
+        map[fy].transactions += 1;
+      });
+
+    const sortedFYs = Object.keys(map).sort();
+    return sortedFYs.map((fy, idx) => {
+      const data = map[fy];
+      const prevSales = idx > 0 ? map[sortedFYs[idx - 1]].sales : undefined;
+      let yoyGrowthPct: number | null = null;
+      if (prevSales !== undefined && prevSales > 0) {
+        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+      }
+      return {
+        financialYear: fy,
+        sales: data.sales,
+        quantity: data.quantity,
+        products: data.products.size,
+        transactions: data.transactions,
+        yoyGrowthPct,
+      };
+    });
+  }, [allRecords, activeCustomer]);
+
+  // Monthly trend for selected customer (Chronological April -> March)
   const customerMonthlyTrend = useMemo(() => {
     if (!activeCustomer) return [];
-    const map: Record<string, { month: string; sales: number; quantity: number }> = {};
+    const map: Record<string, { month: string; sales: number; quantity: number; sortKey: number }> = {};
 
     filteredRecords
       .filter(r => r.customer === activeCustomer.customer)
       .forEach(r => {
         if (!map[r.month]) {
-          map[r.month] = { month: r.month, sales: 0, quantity: 0 };
+          let sortKey = r.monthSortKey;
+          if (sortKey === undefined) {
+            const dateObj = new Date(r.billDate);
+            sortKey = isNaN(dateObj.getTime()) ? 0 : dateObj.getFullYear() * 12 + dateObj.getMonth();
+          }
+          map[r.month] = { month: r.month, sales: 0, quantity: 0, sortKey };
         }
         map[r.month].sales += r.saleValue;
-        map[r.month].quantity += r.saleQty;
+        map[r.month].quantity += r.invQty;
       });
 
-    return Object.values(map);
+    return Object.values(map).sort((a, b) => a.sortKey - b.sortKey);
   }, [filteredRecords, activeCustomer]);
 
   // Products purchased by selected customer
@@ -38,11 +80,12 @@ export const CustomerAnalysis: React.FC = () => {
     filteredRecords
       .filter(r => r.customer === activeCustomer.customer)
       .forEach(r => {
-        if (!map[r.materialCode]) {
-          map[r.materialCode] = { description: r.description, segment: r.productSegment, sales: 0, quantity: 0 };
+        const key = `${r.materialCode}|||${r.description}`;
+        if (!map[key]) {
+          map[key] = { description: r.description, segment: r.productSegment, sales: 0, quantity: 0 };
         }
-        map[r.materialCode].sales += r.saleValue;
-        map[r.materialCode].quantity += r.saleQty;
+        map[key].sales += r.saleValue;
+        map[key].quantity += r.invQty;
       });
 
     return Object.values(map).sort((a, b) => b.sales - a.sales);

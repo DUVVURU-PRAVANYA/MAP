@@ -19,7 +19,8 @@ export interface CleanSalesRecord {
   description: string;
   billDate: string; // ISO format YYYY-MM-DD
   month: string; // e.g. "Apr 2025" or "April"
-  quarter: string; // e.g. "Q1 FY26" or "Q1"
+  monthSortKey?: number; // Chronological sorting key (year * 12 + monthIndex)
+  quarter: string; // e.g. "Q1" or "Q1 FY25"
   year: number; // e.g. 2025
   financialYear: string; // e.g. "FY 2024-25"
   invQty: number;
@@ -40,6 +41,8 @@ export interface FinancialYearMetric {
   transactions: number;
   prevSales?: number;
   yoyGrowthPct?: number | null;
+  prevQuantity?: number;
+  qtyGrowthPct?: number | null;
 }
 
 export interface DataValidationRule {
@@ -89,11 +92,12 @@ export interface KPIMetrics {
 }
 
 export interface TimeTrendPoint {
-  period: string; // Date or Quarter label
+  period: string; // Month label
   sales: number;
   quantity: number;
   transactions: number;
   customers: number;
+  monthSortKey?: number;
 }
 
 export interface SegmentMetric {
@@ -102,17 +106,21 @@ export interface SegmentMetric {
   quantity: number;
   productCount: number;
   customerCount: number;
+  transactionCount: number;
   percentage: number;
+  rank: number;
 }
 
 export interface ProductMetric {
+  product: string; // `${materialCode} - ${description}`
   materialCode: string;
   description: string;
   segment: string;
   sales: number;
-  quantity: number;
+  quantity: number; // Inv Qty
   transactionCount: number;
   customerCount: number;
+  salesContributionPct: number;
   rank: number;
 }
 

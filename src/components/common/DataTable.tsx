@@ -135,7 +135,7 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
               </th>
               <th onClick={() => handleSort('productSegment')} className="py-3 px-4 cursor-pointer">
                 <div className="flex items-center space-x-1">
-                  <span>Segment</span>
+                  <span>Vehicle Segment</span>
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>

@@ -105,7 +105,7 @@ export const TimeAnalysis: React.FC = () => {
                 <th className="py-3 px-4">Period</th>
                 <th className="py-3 px-4 text-right">Sales Value</th>
                 <th className="py-3 px-4 text-right">{granularity === 'monthly' ? 'MoM Sales Change' : 'QoQ Sales Change'}</th>
-                <th className="py-3 px-4 text-right">Quantity Sold</th>
+                <th className="py-3 px-4 text-right">Invoice Quantity</th>
                 <th className="py-3 px-4 text-right">{granularity === 'monthly' ? 'MoM Qty Change' : 'QoQ Qty Change'}</th>
                 <th className="py-3 px-4 text-center">Active Accounts</th>
               </tr>

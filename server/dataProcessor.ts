@@ -31,7 +31,7 @@ export function parseAndCleanExcel(fileBuffer: Buffer, filename: string): Proces
   return processRawRecords(rawData, filename);
 }
 
-export function calculateFinancialYear(dateObj: Date): { financialYear: string; year: number; month: string; quarter: string } {
+export function calculateFinancialYear(dateObj: Date): { financialYear: string; year: number; month: string; quarter: string; monthSortKey: number } {
   const yyyy = dateObj.getFullYear();
   const m = dateObj.getMonth(); // 0-indexed: 0=Jan, 3=Apr, 11=Dec
 
@@ -54,8 +54,36 @@ export function calculateFinancialYear(dateObj: Date): { financialYear: string; 
   const financialYear = `FY ${fyStartYear}-${fyEndYear.toString().slice(-2)}`;
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const month = `${monthNames[m]} ${yyyy}`;
+  const monthSortKey = yyyy * 12 + m;
 
-  return { financialYear, year: yyyy, month, quarter };
+  return { financialYear, year: yyyy, month, quarter, monthSortKey };
+}
+
+const HEADER_ALIASES: Record<string, string[]> = {
+  custNum: ['custnum', 'custno', 'customernumber', 'customercode'],
+  customer: ['customer', 'customername', 'custname'],
+  materialCode: ['materialcode', 'itemcode', 'productcode', 'matcode'],
+  description: ['description', 'materialdescription', 'productdescription', 'itemname'],
+  billDate: ['billdate', 'invoicedate', 'date'],
+  invQty: ['invqty', 'invoiceqty', 'invoicequantity'],
+  saleValue: ['salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
+  saleQty: ['saleqtyinnos', 'saleqty', 'salesqty', 'quantity'],
+  productSegment: ['productsegment', 'segment', 'category'],
+};
+
+export function normalizeHeader(str: string): string {
+  return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function parseNumeric(val: any): number {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = String(val).trim();
+  if (!str) return 0;
+  // Remove currency symbols (₹, $), commas (Indian & Western formatting), spaces
+  const cleaned = str.replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
 }
 
 export function processRawRecords(rawData: RawSalesRecord[], filename: string): ProcessingResult {
@@ -114,41 +142,46 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     },
   };
 
-  // Check column presence in first 10 rows
+  // Check column presence in sample row using robust header normalization
   const sampleRow = rawData[0] || {};
-  const actualCols = Object.keys(sampleRow);
-  const missingCols = REQUIRED_COLUMNS.filter(req => !actualCols.some(col => col.trim().toLowerCase() === req.toLowerCase()));
+  const actualNormalizedCols = Object.keys(sampleRow).map(normalizeHeader);
 
-  if (missingCols.length > 0) {
+  const missingConcepts = Object.entries(HEADER_ALIASES).filter(([concept, aliases]) => {
+    return !aliases.some(alias => actualNormalizedCols.includes(alias));
+  });
+
+  if (missingConcepts.length > 0) {
     validationRulesMap.required_cols.status = 'warning';
-    validationRulesMap.required_cols.details = [`Missing expected columns: ${missingCols.join(', ')}`];
+    validationRulesMap.required_cols.details = [`Missing expected column concepts: ${missingConcepts.map(m => m[0]).join(', ')}`];
   }
 
   rawData.forEach((row, index) => {
     const rowNum = index + 2; // Excel row indexing starting from row 2 (row 1 is header)
 
-    // Extract values with flexible key matching (tolerant of company Excel headers & variations)
-    const getVal = (keys: string[]) => {
-      for (const k of keys) {
-        const foundKey = Object.keys(row).find(rk => rk.trim().toLowerCase() === k.toLowerCase());
-        if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
-          return row[foundKey];
+    // Extract values matching normalized header aliases
+    const getValByConcept = (conceptKey: keyof typeof HEADER_ALIASES) => {
+      const aliases = HEADER_ALIASES[conceptKey];
+      for (const rk of Object.keys(row)) {
+        const normKey = normalizeHeader(rk);
+        if (aliases.includes(normKey)) {
+          const val = row[rk];
+          if (val !== undefined && val !== null) return val;
         }
       }
       return '';
     };
 
-    const custNum = String(getVal(['Cust Num.', 'Cust Num', 'Customer Number', 'Customer Code', 'Cust No'])).trim();
-    const customer = String(getVal(['Customer', 'Customer Name', 'Cust Name'])).trim();
-    const materialCode = String(getVal(['Material code', 'Material Code', 'Item Code', 'Product Code', 'Mat Code'])).trim();
-    let description = String(getVal(['Description', 'Material Description', 'Product Description', 'Item Name'])).trim();
-    const rawBillDate = getVal(['Bill Date', 'Invoice Date', 'Date']);
-    const rawInvQty = getVal(['Inv. Qty', 'Inv Qty', 'Invoice Qty', 'Invoice Quantity']);
-    const rawSaleVal = getVal(['Sale value (Doc rate)', 'Sale Value (Doc rate)', 'Sale Value', 'Sales Value', 'Amount', 'Total Sales']);
-    const rawSaleQty = getVal(['Sale qty in nos', 'Sale Qty in nos', 'Sale Qty', 'Sales Qty', 'Quantity']);
-    let productSegment = String(getVal(['Product Segment', 'Segment', 'Category'])).trim();
+    const custNum = String(getValByConcept('custNum')).trim();
+    const customer = String(getValByConcept('customer')).trim();
+    const materialCode = String(getValByConcept('materialCode')).trim();
+    let description = String(getValByConcept('description')).trim();
+    const rawBillDate = getValByConcept('billDate');
+    const rawInvQty = getValByConcept('invQty');
+    const rawSaleVal = getValByConcept('saleValue');
+    const rawSaleQty = getValByConcept('saleQty');
+    let productSegment = String(getValByConcept('productSegment')).trim();
 
-    // Check duplicate
+    // Check duplicate signature
     const signature = `${custNum}|${materialCode}|${rawBillDate}|${rawSaleVal}|${rawSaleQty}`;
     if (seenSignatures.has(signature)) {
       duplicatesCount++;
@@ -161,23 +194,26 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     }
     seenSignatures.add(signature);
 
-    // Parse numbers
-    const invQty = parseFloat(String(rawInvQty).replace(/[^0-9.-]+/g, '')) || 0;
-    const saleValue = parseFloat(String(rawSaleVal).replace(/[^0-9.-]+/g, '')) || 0;
-    const saleQty = parseFloat(String(rawSaleQty).replace(/[^0-9.-]+/g, '')) || 0;
+    // Parse numeric fields with robust formatting tolerance
+    const invQty = parseNumeric(rawInvQty);
+    const saleValue = parseNumeric(rawSaleVal);
+    const saleQty = parseNumeric(rawSaleQty);
 
-    if (saleValue <= 0 && saleQty <= 0 && invQty <= 0) {
+    // Discard only if row has zero/unparseable values across all numeric fields and lacks account details
+    if (saleValue <= 0 && saleQty <= 0 && invQty <= 0 && !customer && !materialCode) {
       invalidRecordsCount++;
       flaggedRows.push({
         rowNumber: rowNum,
-        issue: 'Invalid or zero sale value and quantity',
+        issue: 'Invalid or missing sales record data',
         rawData: row,
       });
       return;
     }
 
-    // Quantity mismatch check
-    if (invQty !== saleQty && Math.abs(invQty - saleQty) > 0.001) {
+    // Quantity mismatch check: compare numeric float values with tolerance
+    const rawInvQtyStr = String(rawInvQty).trim();
+    const rawSaleQtyStr = String(rawSaleQty).trim();
+    if (rawInvQtyStr !== '' && rawSaleQtyStr !== '' && Math.abs(invQty - saleQty) >= 0.000001) {
       quantityMismatchCount++;
     }
 
@@ -204,7 +240,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
 
     const fyDetails = calculateFinancialYear(parsedDateObj);
 
-    // Missing handling
+    // Missing handling defaults
     if (!productSegment) {
       productSegment = 'Uncategorized';
       missingValuesFixedCount++;
@@ -222,19 +258,20 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       description,
       billDate: isoDate,
       month: fyDetails.month,
+      monthSortKey: fyDetails.monthSortKey,
       quarter: fyDetails.quarter,
       year: fyDetails.year,
       financialYear: fyDetails.financialYear,
       invQty,
       saleValue,
-      saleQty,
+      saleQty: rawSaleQtyStr !== '' ? saleQty : invQty,
       productSegment,
     });
   });
 
   // Calculate summary counts
   const customerSet = new Set(cleanRecords.map(r => r.customer));
-  const productSet = new Set(cleanRecords.map(r => r.materialCode));
+  const productSet = new Set(cleanRecords.map(r => `${r.materialCode}|||${r.description}`));
   const segmentSet = new Set(cleanRecords.map(r => r.productSegment));
 
   const sortedDates = [...cleanRecords].map(r => r.billDate).sort();

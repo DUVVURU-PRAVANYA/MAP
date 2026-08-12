@@ -153,9 +153,9 @@ export const OverviewDashboard: React.FC = () => {
             />
           </div>
 
-          {/* Product Segment Filter */}
+          {/* Vehicle Segment Filter */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Product Segment</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vehicle Segment</label>
             <select
               value={filters.segments[0] || ''}
               onChange={e => {
@@ -167,7 +167,7 @@ export const OverviewDashboard: React.FC = () => {
               }}
               className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              <option value="">All Segments ({availableSegments.length})</option>
+              <option value="">All Vehicle Segments ({availableSegments.length})</option>
               {availableSegments.map(seg => (
                 <option key={seg} value={seg}>
                   {seg}
@@ -278,121 +278,107 @@ export const OverviewDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* 8 Animated KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* 7 Core KPI Cards (Invoice Qty as Primary Quantity) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {/* KPI 1: Total Sales Value */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Sales Value</span>
-            <div className="p-2 rounded-lg bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400">
-              <IndianRupee className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Sales Value</span>
+            <div className="p-1.5 rounded-lg bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400">
+              <IndianRupee className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {formatCurrency(kpiMetrics.totalSalesValue)}
           </p>
-          <div className="flex items-center space-x-1 text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>↑ 12.4% vs prior period</span>
+          <div className="flex items-center space-x-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
+            <ArrowUpRight className="w-3 h-3" />
+            <span>Revenue</span>
           </div>
         </div>
 
         {/* KPI 2: Total Invoice Quantity */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Invoice Qty</span>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Inv. Qty</span>
             <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-              <Boxes className="w-4 h-4" />
+              <Boxes className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {kpiMetrics.totalInvQty.toLocaleString()}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Cases / Invoice packs</p>
+          <p className="text-[10px] text-slate-400 mt-1">Primary Quantity</p>
         </div>
 
-        {/* KPI 3: Total Sale Qty in Nos */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 3: Active Customers */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Sale Qty (Nos)</span>
-            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
-              <ShoppingBag className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Customers</span>
+            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+              <Users className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
-            {kpiMetrics.totalSaleQty.toLocaleString()}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">Individual units sold</p>
-        </div>
-
-        {/* KPI 4: Active Customers */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Customers</span>
-            <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {kpiMetrics.customerCount}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Active retail accounts</p>
+          <p className="text-[10px] text-slate-400 mt-1">Active Accounts</p>
         </div>
 
-        {/* KPI 5: Product SKUs */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 4: Product SKUs */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Products</span>
-            <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-              <Package className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Products</span>
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+              <Package className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {kpiMetrics.productCount}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Active SKUs sold</p>
+          <p className="text-[10px] text-slate-400 mt-1">Active SKUs</p>
         </div>
 
-        {/* KPI 6: Product Segments */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 5: Vehicle Segments */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Product Segments</span>
-            <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400">
-              <Layers className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Vehicle Segments</span>
+            <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400">
+              <Layers className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {kpiMetrics.segmentCount}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Categories analyzed</p>
+          <p className="text-[10px] text-slate-400 mt-1">Vehicle Categories</p>
         </div>
 
-        {/* KPI 7: Total Transactions */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 6: Total Transactions */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Transactions</span>
-            <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
-              <Receipt className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Transactions</span>
+            <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
+              <Receipt className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {kpiMetrics.transactionCount.toLocaleString()}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Completed billing entries</p>
+          <p className="text-[10px] text-slate-400 mt-1">Billing Entries</p>
         </div>
 
-        {/* KPI 8: Average Sale Value */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 7: Average Sale Value */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Avg Sale / Invoice</span>
-            <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400">
-              <TrendingUp className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Avg / Invoice</span>
+            <div className="p-1.5 rounded-lg bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400">
+              <TrendingUp className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             ₹{kpiMetrics.avgSalesValue.toLocaleString('en-IN')}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">Average invoice size</p>
+          <p className="text-[10px] text-slate-400 mt-1">Avg Invoice Size</p>
         </div>
       </div>
 
@@ -405,14 +391,24 @@ export const OverviewDashboard: React.FC = () => {
                 <TrendingUp className="w-5 h-5 text-brand-500" />
                 <span>Financial Year Performance & YoY Growth</span>
               </h3>
-              <p className="text-xs text-slate-500">April to March financial year comparison with Year-over-Year growth velocity</p>
+              <p className="text-xs text-slate-500">Select any Financial Year to filter the entire dashboard</p>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setFilter('financialYears', [])}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  filters.financialYears.length === 0
+                    ? 'bg-brand-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                All Years ({availableFinancialYears.length})
+              </button>
               {availableFinancialYears.map(fy => (
                 <button
                   key={fy}
                   onClick={() => toggleFinancialYearFilter(fy)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
                     filters.financialYears.includes(fy)
                       ? 'bg-brand-600 text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
@@ -439,7 +435,7 @@ export const OverviewDashboard: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-900/60 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 bg-brand-100 dark:bg-brand-900/60 px-2.5 py-0.5 rounded-full">
                       {item.financialYear}
                     </span>
                     {item.yoyGrowthPct !== null && item.yoyGrowthPct !== undefined ? (
@@ -477,6 +473,55 @@ export const OverviewDashboard: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+
+          {/* Multi-Financial Year Side-by-Side Comparison Matrix */}
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wider">
+              Multi-Year Performance Matrix (Comparative Table)
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-2.5 px-3">Financial Year</th>
+                    <th className="py-2.5 px-3 text-right">Sales Value</th>
+                    <th className="py-2.5 px-3 text-right">YoY Sales Growth</th>
+                    <th className="py-2.5 px-3 text-right">Invoice Quantity</th>
+                    <th className="py-2.5 px-3 text-right">Customers</th>
+                    <th className="py-2.5 px-3 text-right">Products (SKUs)</th>
+                    <th className="py-2.5 px-3 text-right">Segments</th>
+                    <th className="py-2.5 px-3 text-right">Transactions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {financialYearBreakdown.map(fyItem => (
+                    <tr key={fyItem.financialYear} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{fyItem.financialYear}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(fyItem.sales)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold">
+                        {fyItem.yoyGrowthPct !== null && fyItem.yoyGrowthPct !== undefined ? (
+                          <span className={fyItem.yoyGrowthPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                            {fyItem.yoyGrowthPct >= 0 ? '+' : ''}{fyItem.yoyGrowthPct}%
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                        {fyItem.quantity.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-medium">{fyItem.customers}</td>
+                      <td className="py-2.5 px-3 text-right font-medium">{fyItem.products}</td>
+                      <td className="py-2.5 px-3 text-right font-medium">{fyItem.segments}</td>
+                      <td className="py-2.5 px-3 text-right font-medium">{fyItem.transactions.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

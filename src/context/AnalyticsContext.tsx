@@ -156,7 +156,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);
       setInsights(data.insights);
-      clearAllFilters();
+      clearAllFilters(data.cleanRecords);
 
       setIsLoading(false);
       setActiveView('quality_summary');
@@ -193,7 +193,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);
       setInsights(data.insights);
-      clearAllFilters();
+      clearAllFilters(data.cleanRecords);
 
       setIsLoading(false);
       setActiveView('quality_summary');
@@ -209,7 +209,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setQualitySummary(null);
     setFilename('');
     setInsights([]);
-    clearAllFilters();
+    clearAllFilters([]);
     setActiveView('landing');
   };
 
@@ -225,9 +225,8 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const toggleFinancialYearFilter = (fy: string) => {
     setFilters(prev => {
-      const exists = prev.financialYears.includes(fy);
-      const nextFYs = exists ? prev.financialYears.filter(f => f !== fy) : [...prev.financialYears, fy];
-      return { ...prev, financialYears: nextFYs };
+      const isOnlySelected = prev.financialYears.length === 1 && prev.financialYears[0] === fy;
+      return { ...prev, financialYears: isOnlySelected ? [] : [fy] };
     });
   };
 
@@ -258,8 +257,18 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
-  const clearAllFilters = () => {
-    setFilters(initialFilters);
+  const clearAllFilters = (recordsOverride?: CleanSalesRecord[]) => {
+    const records = recordsOverride || allRecords;
+    const fys = Array.from(new Set(records.map(r => r.financialYear))).filter(Boolean).sort();
+    const latestFY = fys.length > 0 ? fys[fys.length - 1] : undefined;
+    setFilters({
+      dateRange: null,
+      financialYears: latestFY ? [latestFY] : [],
+      segments: [],
+      products: [],
+      customers: [],
+      searchTerm: '',
+    });
     setBreadcrumbs([{ label: 'All Sales', type: 'all' }]);
   };
 
@@ -316,8 +325,11 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) {
         return false;
       }
-      if (filters.products.length > 0 && !filters.products.includes(r.description) && !filters.products.includes(r.materialCode)) {
-        return false;
+      if (filters.products.length > 0) {
+        const prodName = `${r.materialCode} - ${r.description}`;
+        if (!filters.products.includes(r.description) && !filters.products.includes(r.materialCode) && !filters.products.includes(prodName)) {
+          return false;
+        }
       }
       if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) {
         return false;
@@ -336,11 +348,24 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   }, [allRecords, filters]);
 
-  // Derived Financial Year Breakdown with YoY Growth Calculation
+  // Dynamic Financial Year Breakdown with YoY Growth & Quantity Growth Calculation
   const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
+    // Respect active segment/product/customer non-FY filters if applied
+    const baseRecords = allRecords.filter(r => {
+      if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+      if (filters.products.length > 0) {
+        const prodName = `${r.materialCode} - ${r.description}`;
+        if (!filters.products.includes(r.description) && !filters.products.includes(r.materialCode) && !filters.products.includes(prodName)) {
+          return false;
+        }
+      }
+      if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+      return true;
+    });
+
     const fyMap: Record<string, { sales: number; quantity: number; customers: Set<string>; products: Set<string>; segments: Set<string>; transactions: number }> = {};
 
-    allRecords.forEach(r => {
+    baseRecords.forEach(r => {
       const fy = r.financialYear || 'FY Unknown';
       if (!fyMap[fy]) {
         fyMap[fy] = { sales: 0, quantity: 0, customers: new Set(), products: new Set(), segments: new Set(), transactions: 0 };
@@ -348,7 +373,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       fyMap[fy].sales += r.saleValue;
       fyMap[fy].quantity += r.invQty;
       fyMap[fy].customers.add(r.customer);
-      fyMap[fy].products.add(r.materialCode);
+      fyMap[fy].products.add(`${r.materialCode}|||${r.description}`);
       fyMap[fy].segments.add(r.productSegment);
       fyMap[fy].transactions += 1;
     });
@@ -356,11 +381,20 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const sortedFYs = Object.keys(fyMap).sort();
     return sortedFYs.map((fy, idx) => {
       const data = fyMap[fy];
-      const prevSales = idx > 0 ? fyMap[sortedFYs[idx - 1]].sales : undefined;
+      const prevData = idx > 0 ? fyMap[sortedFYs[idx - 1]] : undefined;
+      const prevSales = prevData?.sales;
+      const prevQuantity = prevData?.quantity;
+
       let yoyGrowthPct: number | null = null;
       if (prevSales !== undefined && prevSales > 0) {
         yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
       }
+
+      let qtyGrowthPct: number | null = null;
+      if (prevQuantity !== undefined && prevQuantity > 0) {
+        qtyGrowthPct = Number((((data.quantity - prevQuantity) / prevQuantity) * 100).toFixed(1));
+      }
+
       return {
         financialYear: fy,
         sales: data.sales,
@@ -371,9 +405,11 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         transactions: data.transactions,
         prevSales,
         yoyGrowthPct,
+        prevQuantity,
+        qtyGrowthPct,
       };
     });
-  }, [allRecords]);
+  }, [allRecords, filters.segments, filters.products, filters.customers]);
 
   // Derived KPI Metrics
   const kpiMetrics = useMemo<KPIMetrics>(() => {
@@ -394,7 +430,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const totalInvQty = filteredRecords.reduce((sum, r) => sum + r.invQty, 0);
     const totalSaleQty = filteredRecords.reduce((sum, r) => sum + r.saleQty, 0);
     const customerCount = new Set(filteredRecords.map(r => r.customer)).size;
-    const productCount = new Set(filteredRecords.map(r => r.materialCode)).size;
+    const productCount = new Set(filteredRecords.map(r => `${r.materialCode}|||${r.description}`)).size;
     const segmentCount = new Set(filteredRecords.map(r => r.productSegment)).size;
     const transactionCount = filteredRecords.length;
     const avgSalesValue = transactionCount > 0 ? Math.round(totalSalesValue / transactionCount) : 0;
@@ -408,47 +444,58 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       segmentCount,
       transactionCount,
       avgSalesValue,
-      prevPeriodDiffSalesValue: 12.4, // indicative benchmark comparison
+      prevPeriodDiffSalesValue: 12.4,
       prevPeriodDiffQty: 8.6,
     };
   }, [filteredRecords]);
 
-  // Derived Time Trends (grouped by Month)
+  // Derived Time Trends (grouped by Month, sorted chronologically April -> March)
   const timeTrends = useMemo<TimeTrendPoint[]>(() => {
-    const monthMap: Record<string, { sales: number; quantity: number; transactions: number; customers: Set<string> }> = {};
+    const monthMap: Record<string, { period: string; sales: number; quantity: number; transactions: number; customers: Set<string>; monthSortKey: number }> = {};
 
     filteredRecords.forEach(r => {
-      if (!monthMap[r.month]) {
-        monthMap[r.month] = { sales: 0, quantity: 0, transactions: 0, customers: new Set() };
+      const key = r.month;
+      if (!monthMap[key]) {
+        // Deriving monthSortKey if not pre-populated
+        let sortKey = r.monthSortKey;
+        if (sortKey === undefined) {
+          const dateObj = new Date(r.billDate);
+          sortKey = isNaN(dateObj.getTime()) ? 0 : dateObj.getFullYear() * 12 + dateObj.getMonth();
+        }
+        monthMap[key] = { period: r.month, sales: 0, quantity: 0, transactions: 0, customers: new Set(), monthSortKey: sortKey };
       }
-      monthMap[r.month].sales += r.saleValue;
-      monthMap[r.month].quantity += r.saleQty;
-      monthMap[r.month].transactions += 1;
-      monthMap[r.month].customers.add(r.customer);
+      monthMap[key].sales += r.saleValue;
+      monthMap[key].quantity += r.invQty; // Primary Quantity Metric is Inv Qty!
+      monthMap[key].transactions += 1;
+      monthMap[key].customers.add(r.customer);
     });
 
-    return Object.entries(monthMap).map(([period, data]) => ({
-      period,
-      sales: data.sales,
-      quantity: data.quantity,
-      transactions: data.transactions,
-      customers: data.customers.size,
-    }));
+    return Object.values(monthMap)
+      .sort((a, b) => a.monthSortKey - b.monthSortKey)
+      .map(data => ({
+        period: data.period,
+        sales: data.sales,
+        quantity: data.quantity,
+        transactions: data.transactions,
+        customers: data.customers.size,
+        monthSortKey: data.monthSortKey,
+      }));
   }, [filteredRecords]);
 
   // Derived Segment Breakdown
   const segmentBreakdown = useMemo<SegmentMetric[]>(() => {
     const total = kpiMetrics.totalSalesValue || 1;
-    const segMap: Record<string, { sales: number; quantity: number; products: Set<string>; customers: Set<string> }> = {};
+    const segMap: Record<string, { sales: number; quantity: number; products: Set<string>; customers: Set<string>; transactions: number }> = {};
 
     filteredRecords.forEach(r => {
       if (!segMap[r.productSegment]) {
-        segMap[r.productSegment] = { sales: 0, quantity: 0, products: new Set(), customers: new Set() };
+        segMap[r.productSegment] = { sales: 0, quantity: 0, products: new Set(), customers: new Set(), transactions: 0 };
       }
       segMap[r.productSegment].sales += r.saleValue;
-      segMap[r.productSegment].quantity += r.saleQty;
-      segMap[r.productSegment].products.add(r.materialCode);
+      segMap[r.productSegment].quantity += r.invQty; // Primary Quantity Metric is Inv Qty!
+      segMap[r.productSegment].products.add(`${r.materialCode}|||${r.description}`);
       segMap[r.productSegment].customers.add(r.customer);
+      segMap[r.productSegment].transactions += 1;
     });
 
     return Object.entries(segMap)
@@ -458,17 +505,21 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         quantity: data.quantity,
         productCount: data.products.size,
         customerCount: data.customers.size,
+        transactionCount: data.transactions,
         percentage: Number(((data.sales / total) * 100).toFixed(1)),
+        rank: 0,
       }))
-      .sort((a, b) => b.sales - a.sales);
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
   }, [filteredRecords, kpiMetrics.totalSalesValue]);
 
-  // Derived Top Products
+  // Derived Top Products (Keyed by Material Code + Description)
   const topProducts = useMemo<ProductMetric[]>(() => {
+    const totalSales = kpiMetrics.totalSalesValue || 1;
     const prodMap: Record<string, { materialCode: string; description: string; segment: string; sales: number; quantity: number; transactions: number; customers: Set<string> }> = {};
 
     filteredRecords.forEach(r => {
-      const key = r.materialCode;
+      const key = `${r.materialCode}|||${r.description}`;
       if (!prodMap[key]) {
         prodMap[key] = {
           materialCode: r.materialCode,
@@ -481,7 +532,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
       }
       prodMap[key].sales += r.saleValue;
-      prodMap[key].quantity += r.saleQty;
+      prodMap[key].quantity += r.invQty; // Primary Quantity Metric is Inv Qty!
       prodMap[key].transactions += 1;
       prodMap[key].customers.add(r.customer);
     });
@@ -489,6 +540,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return Object.values(prodMap)
       .sort((a, b) => b.sales - a.sales)
       .map((item, idx) => ({
+        product: `${item.materialCode} - ${item.description}`,
         materialCode: item.materialCode,
         description: item.description,
         segment: item.segment,
@@ -496,9 +548,10 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         quantity: item.quantity,
         transactionCount: item.transactions,
         customerCount: item.customers.size,
+        salesContributionPct: Number(((item.sales / totalSales) * 100).toFixed(1)),
         rank: idx + 1,
       }));
-  }, [filteredRecords]);
+  }, [filteredRecords, kpiMetrics.totalSalesValue]);
 
   // Derived Top Customers
   const topCustomers = useMemo<CustomerMetric[]>(() => {
@@ -518,9 +571,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
       }
       custMap[key].sales += r.saleValue;
-      custMap[key].quantity += r.saleQty;
+      custMap[key].quantity += r.invQty; // Primary Quantity Metric is Inv Qty!
       custMap[key].transactions += 1;
-      custMap[key].products.add(r.materialCode);
+      custMap[key].products.add(`${r.materialCode}|||${r.description}`);
       custMap[key].segments.add(r.productSegment);
     });
 
@@ -538,7 +591,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }));
   }, [filteredRecords]);
 
-  // Derived Quarterly Breakdown
+  // Derived Quarterly Breakdown (Q1 April-June, Q2 July-Sept, Q3 Oct-Dec, Q4 Jan-Mar)
   const quarterlyBreakdown = useMemo(() => {
     const qMap: Record<string, { sales: number; quantity: number; customers: Set<string> }> = {};
 
@@ -547,10 +600,11 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         qMap[r.quarter] = { sales: 0, quantity: 0, customers: new Set() };
       }
       qMap[r.quarter].sales += r.saleValue;
-      qMap[r.quarter].quantity += r.saleQty;
+      qMap[r.quarter].quantity += r.invQty; // Primary Quantity Metric is Inv Qty!
       qMap[r.quarter].customers.add(r.customer);
     });
 
+    const quarterOrder = ['Q1', 'Q2', 'Q3', 'Q4'];
     return Object.entries(qMap)
       .map(([quarter, data]) => ({
         quarter,
@@ -558,7 +612,12 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         quantity: data.quantity,
         customers: data.customers.size,
       }))
-      .sort((a, b) => a.quarter.localeCompare(b.quarter));
+      .sort((a, b) => {
+        const idxA = quarterOrder.findIndex(q => a.quarter.startsWith(q));
+        const idxB = quarterOrder.findIndex(q => b.quarter.startsWith(q));
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        return a.quarter.localeCompare(b.quarter);
+      });
   }, [filteredRecords]);
 
   return (
