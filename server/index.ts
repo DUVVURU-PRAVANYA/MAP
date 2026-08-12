@@ -119,6 +119,7 @@ app.post('/api/export', (req: Request, res: Response) => {
       'Customer Name': r.customer,
       'Material Code': r.materialCode,
       'Description': r.description,
+      'Product': r.product || r.description,
       'Bill Date': r.billDate,
       'Year': r.year || '',
       'Month': r.month,

@@ -116,6 +116,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   customer: ['customer', 'customername', 'custname'],
   materialCode: ['materialcode', 'itemcode', 'productcode', 'matcode'],
   description: ['description', 'materialdescription', 'productdescription', 'itemname'],
+  product: ['product', 'productname', 'item'],
   billDate: ['billdate', 'invoicedate', 'date'],
   invQty: ['invqty', 'invoiceqty', 'invoicequantity'],
   saleValue: ['salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
@@ -227,6 +228,10 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     const customer = String(getValByConcept('customer')).trim();
     const materialCode = String(getValByConcept('materialCode')).trim();
     let description = String(getValByConcept('description')).trim();
+    let productCol = String(getValByConcept('product')).trim();
+    if (!description && productCol) {
+      description = productCol;
+    }
     const rawBillDate = getValByConcept('billDate');
     const rawInvQty = getValByConcept('invQty');
     const rawSaleVal = getValByConcept('saleValue');
@@ -288,6 +293,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       customer: customer || 'General Customer',
       materialCode: materialCode || 'MAT-GENERIC',
       description,
+      product: productCol || description,
       billDate: isoDate,
       month: fyDetails.month,
       monthSortKey: fyDetails.monthSortKey,

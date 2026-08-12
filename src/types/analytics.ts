@@ -7,7 +7,9 @@ export interface RawSalesRecord {
   'Inv. Qty'?: string | number;
   'Sale value (Doc rate)'?: string | number;
   'Sale qty in nos'?: string | number;
+  'Product'?: string;
   'Product Segment'?: string;
+  'Segment'?: string;
   [key: string]: any;
 }
 
@@ -17,6 +19,7 @@ export interface CleanSalesRecord {
   customer: string;
   materialCode: string;
   description: string;
+  product?: string;
   billDate: string; // ISO format YYYY-MM-DD
   month: string; // e.g. "Apr 2025" or "April"
   monthSortKey?: number; // Chronological sorting key (year * 12 + monthIndex)
