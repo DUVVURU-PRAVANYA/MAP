@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "start": "tsx server/index.ts",
+    "start": "tsx watch server/index.ts",
     "lint": "tsc",
     "preview": "vite preview",
-    "server": "tsx server/index.ts",
+    "server": "tsx watch server/index.ts",
     "generate-sample": "tsx scripts/generateSampleData.ts"
   },
   "dependencies": {
