@@ -211,6 +211,32 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await new Promise(r => setTimeout(r, 600));
 
       const data = await response.json();
+
+      const recs: CleanSalesRecord[] = data.cleanRecords || [];
+      const sortedDates = [...recs].map(r => r.billDate).sort();
+      const minBillDate = sortedDates[0] || 'N/A';
+      const maxBillDate = sortedDates[sortedDates.length - 1] || 'N/A';
+
+      const fyDist: Record<string, number> = {};
+      recs.forEach(r => {
+        fyDist[r.financialYear] = (fyDist[r.financialYear] || 0) + 1;
+      });
+
+      const mar31Recs = recs.filter(r => r.billDate === '2025-03-31');
+      const apr01Recs = recs.filter(r => r.billDate === '2025-04-01');
+
+      console.log('\n[FRONTEND DIAGNOSTIC] Upload HTTP Response received:');
+      console.log('  Status:', response.status);
+      console.log('  Response JSON Keys:', Object.keys(data));
+      console.log('  Response Clean Record Count:', recs.length);
+      console.log('  Response Minimum Bill Date:', minBillDate);
+      console.log('  Response Maximum Bill Date:', maxBillDate);
+      console.log('  Response FY Distribution:', fyDist);
+      console.log('  First 5 Bill Dates:', recs.slice(0, 5).map(r => `${r.id}: ${r.billDate} (${r.financialYear})`));
+      console.log('  Last 5 Bill Dates:', recs.slice(-5).map(r => `${r.id}: ${r.billDate} (${r.financialYear})`));
+      console.log(`  Records with billDate === "2025-03-31": ${mar31Recs.length}`, mar31Recs.slice(0, 5));
+      console.log(`  Records with billDate === "2025-04-01": ${apr01Recs.length}`, apr01Recs.slice(0, 5));
+
       setFilename(data.filename);
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);
