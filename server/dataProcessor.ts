@@ -31,35 +31,37 @@ export function parseAndCleanExcel(fileBuffer: Buffer, filename: string): Proces
   return processRawRecords(rawData, filename);
 }
 
-export function calculateFinancialYear(dateObj: Date): { financialYear: string; year: number; month: string; quarter: string; monthSortKey: number } {
-  const yyyy = dateObj.getFullYear();
-  const m = dateObj.getMonth(); // 0-indexed: 0=Jan, 3=Apr, 11=Dec
-
+export function calculateFinancialYearFromYMD(year: number, month: number): { financialYear: string; year: number; month: string; quarter: string; monthSortKey: number } {
+  // month is 1-indexed: 1=Jan, 4=Apr, 12=Dec
   let fyStartYear: number;
   let quarter: string;
 
-  if (m >= 3) {
-    // April (3) to December (11) -> Start of Financial Year
-    fyStartYear = yyyy;
-    if (m >= 3 && m <= 5) quarter = 'Q1';
-    else if (m >= 6 && m <= 8) quarter = 'Q2';
+  if (month >= 4) {
+    // April (4) to December (12) -> Start of Financial Year
+    fyStartYear = year;
+    if (month >= 4 && month <= 6) quarter = 'Q1';
+    else if (month >= 7 && month <= 9) quarter = 'Q2';
     else quarter = 'Q3';
   } else {
-    // January (0) to March (2) -> End of Financial Year
-    fyStartYear = yyyy - 1;
+    // January (1) to March (3) -> End of Financial Year
+    fyStartYear = year - 1;
     quarter = 'Q4';
   }
 
   const fyEndYear = fyStartYear + 1;
   const financialYear = `FY ${fyStartYear}-${fyEndYear.toString().slice(-2)}`;
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = `${monthNames[m]} ${yyyy}`;
-  const monthSortKey = yyyy * 12 + m;
+  const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthStr = `${monthNames[month] || 'Jan'} ${year}`;
+  const monthSortKey = year * 12 + (month - 1);
 
-  return { financialYear, year: yyyy, month, quarter, monthSortKey };
+  return { financialYear, year, month: monthStr, quarter, monthSortKey };
 }
 
-export function parseExcelDateOnly(rawVal: any): { isoDate: string; parsedDateObj: Date; fyDetails: ReturnType<typeof calculateFinancialYear> } {
+export function calculateFinancialYear(dateObj: Date) {
+  return calculateFinancialYearFromYMD(dateObj.getFullYear(), dateObj.getMonth() + 1);
+}
+
+export function parseExcelDateOnly(rawVal: any): { isoDate: string; year: number; month: number; day: number; fyDetails: ReturnType<typeof calculateFinancialYearFromYMD> } {
   let yyyy = 2025;
   let mmNum = 4;
   let ddNum = 1;
@@ -72,13 +74,8 @@ export function parseExcelDateOnly(rawVal: any): { isoDate: string; parsedDateOb
       mmNum = parsed.m;
       ddNum = parsed.d;
     }
-  } else if (rawVal instanceof Date && !isNaN(rawVal.getTime())) {
-    // 2. Native JS Date object
-    yyyy = rawVal.getFullYear();
-    mmNum = rawVal.getMonth() + 1;
-    ddNum = rawVal.getDate();
   } else {
-    // 3. String value parsing (e.g. "01-Apr-2025", "1-Apr-25", "2025-04-01", "23-Jan-2025")
+    // 2. String value parsing (e.g. "01-Apr-2025", "1-Apr-25", "2025-04-01", "23-Jan-2025")
     const str = String(rawVal || '').trim();
     if (str) {
       const parts = str.split(/[-/\s.]/);
@@ -101,20 +98,6 @@ export function parseExcelDateOnly(rawVal: any): { isoDate: string; parsedDateOb
           yyyy = y;
           mmNum = m;
           ddNum = d;
-        } else {
-          const fallback = new Date(str);
-          if (!isNaN(fallback.getTime())) {
-            yyyy = fallback.getFullYear();
-            mmNum = fallback.getMonth() + 1;
-            ddNum = fallback.getDate();
-          }
-        }
-      } else {
-        const fallback = new Date(str);
-        if (!isNaN(fallback.getTime())) {
-          yyyy = fallback.getFullYear();
-          mmNum = fallback.getMonth() + 1;
-          ddNum = fallback.getDate();
         }
       }
     }
@@ -123,10 +106,9 @@ export function parseExcelDateOnly(rawVal: any): { isoDate: string; parsedDateOb
   const mm = String(mmNum).padStart(2, '0');
   const dd = String(ddNum).padStart(2, '0');
   const isoDate = `${yyyy}-${mm}-${dd}`;
-  const parsedDateObj = new Date(yyyy, mmNum - 1, ddNum);
-  const fyDetails = calculateFinancialYear(parsedDateObj);
+  const fyDetails = calculateFinancialYearFromYMD(yyyy, mmNum);
 
-  return { isoDate, parsedDateObj, fyDetails };
+  return { isoDate, year: yyyy, month: mmNum, day: ddNum, fyDetails };
 }
 
 const HEADER_ALIASES: Record<string, string[]> = {
