@@ -104,6 +104,17 @@ export interface TimeTrendPoint {
   monthSortKey?: number;
 }
 
+export interface ProductFamilyMetric {
+  productFamily: string;
+  sales: number;
+  quantity: number;
+  skuCount: number;
+  customerCount: number;
+  transactionCount: number;
+  percentage: number;
+  rank: number;
+}
+
 export interface SegmentMetric {
   segment: string;
   sales: number;

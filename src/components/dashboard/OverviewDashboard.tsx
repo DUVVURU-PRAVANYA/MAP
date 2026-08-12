@@ -66,9 +66,9 @@ export const OverviewDashboard: React.FC = () => {
   const [quarterMetricType, setQuarterMetricType] = useState<'sales' | 'quantity' | 'customers'>('sales');
 
   // Available unique segments, products, customers for filter dropdowns
-  const availableSegments = useMemo(() => Array.from(new Set(allRecords.map(r => r.productSegment))), [allRecords]);
-  const availableProducts = useMemo(() => Array.from(new Set(allRecords.map(r => r.description))), [allRecords]);
-  const availableCustomers = useMemo(() => Array.from(new Set(allRecords.map(r => r.customer))), [allRecords]);
+  const availableSegments = useMemo(() => Array.from(new Set(allRecords.map(r => r.productSegment).filter(Boolean))), [allRecords]);
+  const availableProducts = useMemo(() => Array.from(new Set(allRecords.map(r => r.product || r.description).filter(Boolean))), [allRecords]);
+  const availableCustomers = useMemo(() => Array.from(new Set(allRecords.map(r => r.customer).filter(Boolean))), [allRecords]);
 
   // Helper formatting INR
   const formatCurrency = (val: number) => {

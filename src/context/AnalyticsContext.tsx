@@ -8,6 +8,7 @@ import {
   FinancialYearMetric,
   KPIMetrics,
   ProductMetric,
+  ProductFamilyMetric,
   SegmentMetric,
   TimeTrendPoint,
   ViewTab,
@@ -100,6 +101,7 @@ interface AnalyticsContextType {
   kpiMetrics: KPIMetrics;
   timeTrends: TimeTrendPoint[];
   segmentBreakdown: SegmentMetric[];
+  productFamilyBreakdown: ProductFamilyMetric[];
   topProducts: ProductMetric[];
   topCustomers: CustomerMetric[];
   quarterlyBreakdown: { quarter: string; sales: number; quantity: number; customers: number }[];
@@ -421,7 +423,12 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       if (filters.products.length > 0) {
         const prodName = `${r.materialCode} - ${r.description}`;
-        if (!filters.products.includes(r.description) && !filters.products.includes(r.materialCode) && !filters.products.includes(prodName)) {
+        const isMatch =
+          filters.products.includes(r.description) ||
+          filters.products.includes(r.materialCode) ||
+          filters.products.includes(prodName) ||
+          (r.product && filters.products.includes(r.product));
+        if (!isMatch) {
           return false;
         }
       }
@@ -607,6 +614,38 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       .map((item, idx) => ({ ...item, rank: idx + 1 }));
   }, [filteredRecords, kpiMetrics.totalSalesValue]);
 
+  // Derived Product Family Breakdown (Excel "Product" Column: 6 Product Families)
+  const productFamilyBreakdown = useMemo<ProductFamilyMetric[]>(() => {
+    const total = kpiMetrics.totalSalesValue || 1;
+    const pfMap: Record<string, { sales: number; quantity: number; skus: Set<string>; customers: Set<string>; transactions: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const pf = r.product || r.description || 'Others';
+      if (!pfMap[pf]) {
+        pfMap[pf] = { sales: 0, quantity: 0, skus: new Set(), customers: new Set(), transactions: 0 };
+      }
+      pfMap[pf].sales += r.saleValue;
+      pfMap[pf].quantity += r.invQty;
+      pfMap[pf].skus.add(`${r.materialCode}|||${r.description}`);
+      pfMap[pf].customers.add(r.customer);
+      pfMap[pf].transactions += 1;
+    });
+
+    return Object.entries(pfMap)
+      .map(([productFamily, data]) => ({
+        productFamily,
+        sales: data.sales,
+        quantity: data.quantity,
+        skuCount: data.skus.size,
+        customerCount: data.customers.size,
+        transactionCount: data.transactions,
+        percentage: Number(((data.sales / total) * 100).toFixed(1)),
+        rank: 0,
+      }))
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }, [filteredRecords, kpiMetrics.totalSalesValue]);
+
   // Derived Top Products (Keyed by Material Code + Description)
   const topProducts = useMemo<ProductMetric[]>(() => {
     const totalSales = kpiMetrics.totalSalesValue || 1;
@@ -759,6 +798,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         kpiMetrics,
         timeTrends,
         segmentBreakdown,
+        productFamilyBreakdown,
         topProducts,
         topCustomers,
         quarterlyBreakdown,

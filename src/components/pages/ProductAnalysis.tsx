@@ -6,6 +6,7 @@ import { useAnalytics } from '../../context/AnalyticsContext';
 export const ProductAnalysis: React.FC = () => {
   const {
     topProducts,
+    productFamilyBreakdown,
     allRecords,
     filteredRecords,
     selectedProduct,
@@ -174,8 +175,8 @@ export const ProductAnalysis: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Product Performance & Yearly Analysis</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Material Code + Description SKU analysis across Financial Years</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Product Performance & Family Analysis</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Excel Product Family categories (Disc Pads, Brake Linings, etc.) and Material Code SKU breakdown</p>
         </div>
 
         <button
@@ -190,6 +191,29 @@ export const ProductAnalysis: React.FC = () => {
           <span>Compare Products ({compareProducts.length})</span>
         </button>
       </div>
+
+      {/* Product Family Categories Grid (Excel "Product" Column: 6 Product Families) */}
+      {productFamilyBreakdown.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Excel Product Families ({productFamilyBreakdown.length})</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {productFamilyBreakdown.map(pf => (
+              <div
+                key={pf.productFamily}
+                className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-1 shadow-sm hover:border-brand-400 transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400">#{pf.rank} • {pf.percentage}%</span>
+                  <Package className="w-3.5 h-3.5 text-brand-500" />
+                </div>
+                <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{pf.productFamily}</p>
+                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{(pf.sales / 100000).toFixed(1)}L</p>
+                <p className="text-[10px] text-slate-400">{pf.skuCount} SKUs • {pf.quantity.toLocaleString()} Inv Qty</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Product Comparison View */}
       {(isCompareOpen || compareProducts.length > 0) && (
