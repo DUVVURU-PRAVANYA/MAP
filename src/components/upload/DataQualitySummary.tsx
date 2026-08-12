@@ -15,7 +15,18 @@ import {
 import { useAnalytics } from '../../context/AnalyticsContext';
 
 export const DataQualitySummary: React.FC = () => {
-  const { qualitySummary, setActiveView, filename } = useAnalytics();
+  const {
+    qualitySummary,
+    setActiveView,
+    filename,
+    selectedReportingFY,
+    setSelectedReportingFY,
+    reportingPeriodLabel,
+    outsideReportingPeriodRecords,
+    filteredRecords,
+    allRecords,
+    availableReportingFYs,
+  } = useAnalytics();
   const [selectedRuleDetails, setSelectedRuleDetails] = useState<any | null>(null);
 
   if (!qualitySummary) return null;
@@ -45,15 +56,82 @@ export const DataQualitySummary: React.FC = () => {
           </button>
         </div>
 
+        {/* Reporting Financial Year Selector & Period Audit Card */}
+        <div className="bg-slate-800/90 border border-brand-500/30 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700/60 pb-4">
+            <div>
+              <div className="inline-flex items-center space-x-2 text-brand-400 text-xs font-bold uppercase tracking-wider mb-1">
+                <Calendar className="w-4 h-4" />
+                <span>Selected Reporting Financial Year</span>
+              </div>
+              <h2 className="text-xl font-extrabold text-white flex items-center gap-3">
+                <span>{selectedReportingFY || 'N/A'}</span>
+                <span className="text-xs font-semibold text-brand-300 bg-brand-950/80 border border-brand-800 px-3 py-1 rounded-full">
+                  {reportingPeriodLabel}
+                </span>
+              </h2>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <label className="text-xs text-slate-400 font-semibold whitespace-nowrap">Reporting FY:</label>
+              <select
+                value={selectedReportingFY}
+                onChange={e => setSelectedReportingFY(e.target.value)}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 border border-brand-500/50 text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {availableReportingFYs.map(fy => (
+                  <option key={fy} value={fy}>
+                    {fy}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+              <p className="text-slate-400 font-medium">Total Uploaded Records</p>
+              <p className="text-lg font-bold text-white mt-1">{allRecords.length.toLocaleString()}</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60">
+              <p className="text-emerald-300 font-medium">Valid Reporting-Period Records</p>
+              <p className="text-lg font-bold text-emerald-400 mt-1">{filteredRecords.length.toLocaleString()}</p>
+              <p className="text-[10px] text-emerald-400/80 mt-0.5">Participating in Main Analytics</p>
+            </div>
+            <div className={`p-3.5 rounded-xl border ${outsideReportingPeriodRecords.length > 0 ? 'bg-amber-950/40 border-amber-800/60' : 'bg-slate-900/60 border-slate-700/60'}`}>
+              <p className="text-amber-300 font-medium">Outside Reporting Period Records</p>
+              <p className="text-lg font-bold text-amber-400 mt-1">{outsideReportingPeriodRecords.length}</p>
+              <p className="text-[10px] text-amber-400/80 mt-0.5">Isolated for Data Quality & Audit</p>
+            </div>
+          </div>
+
+          {outsideReportingPeriodRecords.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-xs text-amber-300 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>{outsideReportingPeriodRecords.length} record(s)</strong> fall outside the selected reporting period ({reportingPeriodLabel}).
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveView('quality')}
+                className="px-3 py-1 text-xs font-semibold bg-amber-900/60 hover:bg-amber-800/80 text-amber-200 rounded-lg border border-amber-700 transition-all shrink-0"
+              >
+                Inspect Audit Log
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Dataset Summary Metrics Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4">
-            <p className="text-xs text-slate-400 font-medium">Clean Records</p>
-            <p className="text-xl font-bold text-emerald-400 mt-1">{qualitySummary.cleanRecords.toLocaleString()}</p>
+            <p className="text-xs text-slate-400 font-medium">Valid Period Rows</p>
+            <p className="text-xl font-bold text-emerald-400 mt-1">{filteredRecords.length.toLocaleString()}</p>
           </div>
           <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4">
-            <p className="text-xs text-slate-400 font-medium">Original Rows</p>
-            <p className="text-xl font-bold text-white mt-1">{qualitySummary.originalRecords.toLocaleString()}</p>
+            <p className="text-xs text-slate-400 font-medium">Total Uploaded</p>
+            <p className="text-xl font-bold text-white mt-1">{allRecords.length.toLocaleString()}</p>
           </div>
           <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4">
             <p className="text-xs text-slate-400 font-medium">Customers</p>

@@ -19,6 +19,32 @@ export interface BreadcrumbItem {
   value?: string;
 }
 
+export function getReportingPeriodBounds(fy: string): { startDate: string; endDate: string; label: string; startYear: number; endYear: number } | null {
+  if (!fy) return null;
+  const match = fy.match(/(\d{4})/);
+  if (!match) return null;
+  const startYear = parseInt(match[1], 10);
+  const endYear = startYear + 1;
+  const startDate = `${startYear}-04-01`;
+  const endDate = `${endYear}-03-31`;
+  const label = `01-Apr-${startYear} → 31-Mar-${endYear}`;
+  return { startDate, endDate, label, startYear, endYear };
+}
+
+export function getPrimaryReportingFY(records: CleanSalesRecord[]): string {
+  if (!records || records.length === 0) return '';
+  const fyMap: Record<string, number> = {};
+  records.forEach(r => {
+    if (r.financialYear) {
+      fyMap[r.financialYear] = (fyMap[r.financialYear] || 0) + 1;
+    }
+  });
+  const entries = Object.entries(fyMap);
+  if (entries.length === 0) return '';
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][0];
+}
+
 interface AnalyticsContextType {
   activeView: ViewTab;
   setActiveView: (view: ViewTab) => void;
@@ -32,6 +58,14 @@ interface AnalyticsContextType {
   insights: BusinessInsight[];
   filters: FilterState;
   breadcrumbs: BreadcrumbItem[];
+
+  // Reporting Financial Year properties
+  selectedReportingFY: string;
+  setSelectedReportingFY: (fy: string) => void;
+  reportingPeriodLabel: string;
+  reportingBounds: { startDate: string; endDate: string; label: string; startYear: number; endYear: number } | null;
+  outsideReportingPeriodRecords: CleanSalesRecord[];
+  availableReportingFYs: string[];
 
   // Financial Year properties
   availableFinancialYears: string[];
@@ -93,6 +127,8 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([{ label: 'All Sales', type: 'all' }]);
 
+  const [selectedReportingFY, setSelectedReportingFY] = useState<string>('');
+
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [compareProducts, setCompareProducts] = useState<string[]>([]);
@@ -118,6 +154,29 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     setTheme('light');
   }, []);
+
+  // Reporting Bounds & Period Label
+  const reportingBounds = useMemo(() => {
+    return getReportingPeriodBounds(selectedReportingFY);
+  }, [selectedReportingFY]);
+
+  const reportingPeriodLabel = useMemo(() => {
+    return reportingBounds ? reportingBounds.label : '';
+  }, [reportingBounds]);
+
+  const availableReportingFYs = useMemo(() => {
+    const fys = Array.from(new Set(allRecords.map(r => r.financialYear))).filter(Boolean).sort();
+    if (selectedReportingFY && !fys.includes(selectedReportingFY)) {
+      fys.push(selectedReportingFY);
+      fys.sort();
+    }
+    return fys;
+  }, [allRecords, selectedReportingFY]);
+
+  const outsideReportingPeriodRecords = useMemo(() => {
+    if (!reportingBounds || allRecords.length === 0) return [];
+    return allRecords.filter(r => r.billDate < reportingBounds.startDate || r.billDate > reportingBounds.endDate);
+  }, [allRecords, reportingBounds]);
 
   // Upload Excel File handler
   const uploadExcelFile = async (file: File) => {
@@ -156,6 +215,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);
       setInsights(data.insights);
+
+      const primaryFY = getPrimaryReportingFY(data.cleanRecords);
+      setSelectedReportingFY(primaryFY || 'FY 2025-26');
       clearAllFilters(data.cleanRecords);
 
       setIsLoading(false);
@@ -193,6 +255,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);
       setInsights(data.insights);
+
+      const primaryFY = getPrimaryReportingFY(data.cleanRecords);
+      setSelectedReportingFY(primaryFY || 'FY 2025-26');
       clearAllFilters(data.cleanRecords);
 
       setIsLoading(false);
@@ -209,6 +274,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setQualitySummary(null);
     setFilename('');
     setInsights([]);
+    setSelectedReportingFY('');
     clearAllFilters([]);
     setActiveView('landing');
   };
@@ -258,12 +324,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const clearAllFilters = (recordsOverride?: CleanSalesRecord[]) => {
-    const records = recordsOverride || allRecords;
-    const fys = Array.from(new Set(records.map(r => r.financialYear))).filter(Boolean).sort();
-    const latestFY = fys.length > 0 ? fys[fys.length - 1] : undefined;
     setFilters({
       dateRange: null,
-      financialYears: latestFY ? [latestFY] : [],
+      financialYears: [],
       segments: [],
       products: [],
       customers: [],
@@ -316,9 +379,14 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setActiveView('overview');
   };
 
-  // Compute Filtered Records
+  // Compute Filtered Records strictly scoped to Selected Reporting FY bounds
   const filteredRecords = useMemo(() => {
     return allRecords.filter(r => {
+      if (reportingBounds) {
+        if (r.billDate < reportingBounds.startDate || r.billDate > reportingBounds.endDate) {
+          return false;
+        }
+      }
       if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) {
         return false;
       }
@@ -346,7 +414,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       return true;
     });
-  }, [allRecords, filters]);
+  }, [allRecords, reportingBounds, filters]);
 
   // Dynamic Financial Year Breakdown with YoY Growth & Quantity Growth Calculation
   const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
@@ -635,6 +703,12 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         insights,
         filters,
         breadcrumbs,
+        selectedReportingFY,
+        setSelectedReportingFY,
+        reportingPeriodLabel,
+        reportingBounds,
+        outsideReportingPeriodRecords,
+        availableReportingFYs,
         availableFinancialYears,
         financialYearBreakdown,
         selectedProduct,

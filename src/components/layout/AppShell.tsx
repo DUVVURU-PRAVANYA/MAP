@@ -33,6 +33,10 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     resetDataset,
     allRecords,
     loadSampleDataset,
+    selectedReportingFY,
+    setSelectedReportingFY,
+    reportingPeriodLabel,
+    availableReportingFYs,
   } = useAnalytics();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -166,6 +170,26 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
+            {/* Reporting Financial Year Selector */}
+            {selectedReportingFY && (
+              <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 border border-brand-300 dark:border-brand-800">
+                <Calendar className="w-3.5 h-3.5 text-brand-500" />
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Reporting FY:</span>
+                <select
+                  value={selectedReportingFY}
+                  onChange={e => setSelectedReportingFY(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-brand-600 dark:text-brand-400 focus:outline-none cursor-pointer"
+                  title={`Selected Reporting Period: ${reportingPeriodLabel}`}
+                >
+                  {availableReportingFYs.map(fy => (
+                    <option key={fy} value={fy} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium">
+                      {fy}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Active Dataset Pill */}
             {filename && (
               <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">

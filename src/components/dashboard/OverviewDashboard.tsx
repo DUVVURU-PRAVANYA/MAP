@@ -54,6 +54,10 @@ export const OverviewDashboard: React.FC = () => {
     setActiveView,
     setSelectedProduct,
     setSelectedCustomer,
+    selectedReportingFY,
+    setSelectedReportingFY,
+    reportingPeriodLabel,
+    availableReportingFYs,
   } = useAnalytics();
 
   const [trendView, setTrendView] = useState<'monthly' | 'quarterly'>('monthly');
@@ -118,9 +122,25 @@ export const OverviewDashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-          {/* Financial Year Filter */}
+          {/* Reporting Financial Year Selector */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Financial Year</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Reporting FY</label>
+            <select
+              value={selectedReportingFY}
+              onChange={e => setSelectedReportingFY(e.target.value)}
+              className="w-full text-xs px-3 py-2 rounded-lg border border-brand-300 dark:border-brand-800 bg-brand-50/50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-extrabold text-brand-600 dark:text-brand-400"
+            >
+              {availableReportingFYs.map(fy => (
+                <option key={fy} value={fy}>
+                  {fy}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Transaction FY Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Transaction FY</label>
             <select
               value={filters.financialYears[0] || ''}
               onChange={e => {
@@ -130,9 +150,9 @@ export const OverviewDashboard: React.FC = () => {
                   setFilter('financialYears', []);
                 }
               }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold text-brand-600 dark:text-brand-400"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold"
             >
-              <option value="">All Years ({availableFinancialYears.length})</option>
+              <option value="">All Transaction FYs ({availableFinancialYears.length})</option>
               {availableFinancialYears.map(fy => (
                 <option key={fy} value={fy}>
                   {fy}

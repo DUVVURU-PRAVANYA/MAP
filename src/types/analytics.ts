@@ -71,6 +71,7 @@ export interface DataQualitySummary {
 
 export interface FilterState {
   dateRange: [string, string] | null; // [start, end]
+  selectedReportingFY?: string;
   financialYears: string[];
   segments: string[];
   products: string[];
