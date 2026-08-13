@@ -374,12 +374,12 @@ export const SegmentAnalysis: React.FC = () => {
             </div>
           </div>
 
-          {/* Segment Monthly & Quarterly Sales Velocity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Segment Monthly, Quarterly & Yearly Sales Velocity */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Monthly Sales Velocity */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
               <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
-                Monthly Velocity (Chronological April → March)
+                Monthly Velocity (April → March)
               </h3>
               <div className="h-56 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -407,6 +407,24 @@ export const SegmentAnalysis: React.FC = () => {
                     <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
                     <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
                     <Bar dataKey="sales" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Yearly Trend */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
+                Yearly Trend (Financial Years)
+              </h3>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={segmentYearlyBreakdown}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
+                    <XAxis dataKey="financialYear" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <Bar dataKey="sales" fill="#10b981" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

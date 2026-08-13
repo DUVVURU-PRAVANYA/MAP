@@ -4,12 +4,12 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { useAnalytics } from '../../context/AnalyticsContext';
 
 export const TimeAnalysis: React.FC = () => {
-  const { timeTrends, quarterlyBreakdown } = useAnalytics();
-  const [granularity, setGranularity] = useState<'monthly' | 'quarterly'>('monthly');
+  const { timeTrends, quarterlyBreakdown, financialYearBreakdown } = useAnalytics();
+  const [granularity, setGranularity] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
 
-  // Compute MoM or QoQ % changes sorted in April-March Financial Year order
+  // Compute MoM, QoQ, or YoY % changes sorted in April-March Financial Year order
   const periodDataWithChange = useMemo(() => {
-    const rawList = granularity === 'monthly' ? timeTrends : quarterlyBreakdown;
+    const rawList = granularity === 'monthly' ? timeTrends : granularity === 'quarterly' ? quarterlyBreakdown : financialYearBreakdown;
     return rawList.map((item, idx) => {
       let salesChangePct = 0;
       let qtyChangePct = 0;
@@ -31,7 +31,7 @@ export const TimeAnalysis: React.FC = () => {
         qtyChangePct,
       };
     });
-  }, [timeTrends, quarterlyBreakdown, granularity]);
+  }, [timeTrends, quarterlyBreakdown, financialYearBreakdown, granularity]);
 
   return (
     <div className="space-y-6 pb-12 font-sans">
@@ -39,7 +39,7 @@ export const TimeAnalysis: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Time & Seasonality Analysis</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Month-over-Month (MoM) & Quarter-over-Quarter (QoQ) growth metrics</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Month-over-Month (MoM), Quarter-over-Quarter (QoQ), and Year-over-Year (YoY) growth metrics</p>
         </div>
 
         <div className="flex items-center space-x-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm">
@@ -63,13 +63,23 @@ export const TimeAnalysis: React.FC = () => {
           >
             Quarterly (QoQ)
           </button>
+          <button
+            onClick={() => setGranularity('yearly')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              granularity === 'yearly'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            Yearly (YoY)
+          </button>
         </div>
       </div>
 
       {/* Main Trend Chart */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
         <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
-          Revenue Trend & Sales Velocity ({granularity === 'monthly' ? 'Monthly' : 'Quarterly'})
+          Revenue Trend & Sales Velocity ({granularity === 'monthly' ? 'Monthly' : granularity === 'quarterly' ? 'Quarterly' : 'Yearly'})
         </h3>
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -81,7 +91,7 @@ export const TimeAnalysis: React.FC = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
-              <XAxis dataKey={granularity === 'monthly' ? 'period' : 'quarter'} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+              <XAxis dataKey={granularity === 'monthly' ? 'period' : granularity === 'quarterly' ? 'quarter' : 'financialYear'} tick={{ fontSize: 11, fill: '#94a3b8' }} />
               <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
               <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
               <Area type="monotone" dataKey="sales" stroke="#10b981" fill="url(#timeGrad)" strokeWidth={3} />
@@ -94,7 +104,7 @@ export const TimeAnalysis: React.FC = () => {
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-card">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            {granularity === 'monthly' ? 'Monthly (MoM)' : 'Quarterly (QoQ)'} Detailed Performance Table
+            {granularity === 'monthly' ? 'Monthly (MoM)' : granularity === 'quarterly' ? 'Quarterly (QoQ)' : 'Yearly (YoY)'} Detailed Performance Table
           </h3>
         </div>
 
@@ -104,15 +114,15 @@ export const TimeAnalysis: React.FC = () => {
               <tr>
                 <th className="py-3 px-4">Period</th>
                 <th className="py-3 px-4 text-right">Sales Value</th>
-                <th className="py-3 px-4 text-right">{granularity === 'monthly' ? 'MoM Sales Change' : 'QoQ Sales Change'}</th>
+                <th className="py-3 px-4 text-right">{granularity === 'monthly' ? 'MoM Sales Change' : granularity === 'quarterly' ? 'QoQ Sales Change' : 'YoY Sales Change'}</th>
                 <th className="py-3 px-4 text-right">Invoice Quantity</th>
-                <th className="py-3 px-4 text-right">{granularity === 'monthly' ? 'MoM Qty Change' : 'QoQ Qty Change'}</th>
+                <th className="py-3 px-4 text-right">{granularity === 'monthly' ? 'MoM Qty Change' : granularity === 'quarterly' ? 'QoQ Qty Change' : 'YoY Qty Change'}</th>
                 <th className="py-3 px-4 text-center">Active Accounts</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {periodDataWithChange.map((row: any, idx: number) => {
-                const label = granularity === 'monthly' ? row.period : row.quarter;
+                const label = granularity === 'monthly' ? row.period : granularity === 'quarterly' ? row.quarter : row.financialYear;
                 const isPositive = row.salesChangePct >= 0;
 
                 return (
