@@ -63,7 +63,7 @@ export const OverviewDashboard: React.FC = () => {
     availableCustomers,
   } = useAnalytics();
 
-  const [trendView, setTrendView] = useState<'monthly' | 'quarterly'>('monthly');
+  const [trendView, setTrendView] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [segmentChartType, setSegmentChartType] = useState<'bar' | 'donut'>('donut');
   const [productMetricType, setProductMetricType] = useState<'sales' | 'quantity'>('sales');
   const [quarterMetricType, setQuarterMetricType] = useState<'sales' | 'quantity' | 'customers'>('sales');
@@ -551,12 +551,22 @@ export const OverviewDashboard: React.FC = () => {
             >
               Quarterly
             </button>
+            <button
+              onClick={() => setTrendView('yearly')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                trendView === 'yearly'
+                  ? 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Yearly
+            </button>
           </div>
         </div>
 
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trendView === 'monthly' ? timeTrends : quarterlyBreakdown}>
+            <AreaChart data={trendView === 'monthly' ? timeTrends : trendView === 'quarterly' ? quarterlyBreakdown : financialYearBreakdown}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#0c8de9" stopOpacity={0.4} />
@@ -565,7 +575,7 @@ export const OverviewDashboard: React.FC = () => {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
               <XAxis
-                dataKey={trendView === 'monthly' ? 'period' : 'quarter'}
+                dataKey={trendView === 'monthly' ? 'period' : trendView === 'quarterly' ? 'quarter' : 'financialYear'}
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
