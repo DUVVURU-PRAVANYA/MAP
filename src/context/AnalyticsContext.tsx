@@ -21,7 +21,7 @@ export interface BreadcrumbItem {
 }
 
 export function getReportingPeriodBounds(fy: string): { startDate: string; endDate: string; label: string; startYear: number; endYear: number } | null {
-  if (!fy) return null;
+  if (!fy || fy === 'ALL' || fy === 'All Years') return null;
   const match = fy.match(/(\d{4})/);
   if (!match) return null;
   const startYear = parseInt(match[1], 10);
@@ -97,6 +97,11 @@ interface AnalyticsContextType {
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
 
+  // Dynamic Cross-Filtering Options
+  availableSegments: string[];
+  availableProducts: string[];
+  availableCustomers: string[];
+
   // Derived Metrics
   kpiMetrics: KPIMetrics;
   timeTrends: TimeTrendPoint[];
@@ -163,12 +168,15 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [selectedReportingFY]);
 
   const reportingPeriodLabel = useMemo(() => {
+    if (!selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years') {
+      return 'All Available Financial Years';
+    }
     return reportingBounds ? reportingBounds.label : '';
-  }, [reportingBounds]);
+  }, [reportingBounds, selectedReportingFY]);
 
   const availableReportingFYs = useMemo(() => {
     const fys = Array.from(new Set(allRecords.map(r => r.financialYear))).filter(Boolean).sort();
-    if (selectedReportingFY && !fys.includes(selectedReportingFY)) {
+    if (selectedReportingFY && selectedReportingFY !== 'ALL' && selectedReportingFY !== 'All Years' && !fys.includes(selectedReportingFY)) {
       fys.push(selectedReportingFY);
       fys.sort();
     }
@@ -176,9 +184,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [allRecords, selectedReportingFY]);
 
   const outsideReportingPeriodRecords = useMemo(() => {
-    if (!reportingBounds || allRecords.length === 0) return [];
-    return allRecords.filter(r => r.billDate < reportingBounds.startDate || r.billDate > reportingBounds.endDate);
-  }, [allRecords, reportingBounds]);
+    if (!selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years' || allRecords.length === 0) return [];
+    return allRecords.filter(r => r.financialYear !== selectedReportingFY);
+  }, [allRecords, selectedReportingFY]);
 
   // Upload Excel File handler
   const uploadExcelFile = async (file: File) => {
@@ -407,13 +415,12 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setActiveView('overview');
   };
 
-  // Compute Filtered Records strictly scoped to Selected Reporting FY bounds
+  // Compute Filtered Records strictly scoped to Selected Financial Year
   const filteredRecords = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
     return allRecords.filter(r => {
-      if (reportingBounds) {
-        if (r.billDate < reportingBounds.startDate || r.billDate > reportingBounds.endDate) {
-          return false;
-        }
+      if (!isAll && r.financialYear !== selectedReportingFY) {
+        return false;
       }
       if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) {
         return false;
@@ -447,7 +454,110 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       return true;
     });
-  }, [allRecords, reportingBounds, filters]);
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Vehicle Segments available given other active filters
+  const availableSegments = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.products.length > 0) {
+              const prodName = `${r.materialCode} - ${r.description}`;
+              const isMatch =
+                filters.products.includes(r.description) ||
+                filters.products.includes(r.materialCode) ||
+                filters.products.includes(prodName) ||
+                (r.product && filters.products.includes(r.product));
+              if (!isMatch) return false;
+            }
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+            if (filters.searchTerm) {
+              const q = filters.searchTerm.toLowerCase();
+              const matches =
+                r.customer.toLowerCase().includes(q) ||
+                r.description.toLowerCase().includes(q) ||
+                r.materialCode.toLowerCase().includes(q) ||
+                r.productSegment.toLowerCase().includes(q) ||
+                (r.product && r.product.toLowerCase().includes(q));
+              if (!matches) return false;
+            }
+            return true;
+          })
+          .map(r => r.productSegment)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters.financialYears, filters.products, filters.customers, filters.searchTerm]);
+
+  // Dynamic Cross-Filtering Options: Product Families / Products available given other active filters
+  const availableProducts = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+            if (filters.searchTerm) {
+              const q = filters.searchTerm.toLowerCase();
+              const matches =
+                r.customer.toLowerCase().includes(q) ||
+                r.description.toLowerCase().includes(q) ||
+                r.materialCode.toLowerCase().includes(q) ||
+                r.productSegment.toLowerCase().includes(q) ||
+                (r.product && r.product.toLowerCase().includes(q));
+              if (!matches) return false;
+            }
+            return true;
+          })
+          .map(r => r.product || r.description)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters.financialYears, filters.segments, filters.customers, filters.searchTerm]);
+
+  // Dynamic Cross-Filtering Options: Customers available given other active filters
+  const availableCustomers = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+            if (filters.products.length > 0) {
+              const prodName = `${r.materialCode} - ${r.description}`;
+              const isMatch =
+                filters.products.includes(r.description) ||
+                filters.products.includes(r.materialCode) ||
+                filters.products.includes(prodName) ||
+                (r.product && filters.products.includes(r.product));
+              if (!isMatch) return false;
+            }
+            if (filters.searchTerm) {
+              const q = filters.searchTerm.toLowerCase();
+              const matches =
+                r.customer.toLowerCase().includes(q) ||
+                r.description.toLowerCase().includes(q) ||
+                r.materialCode.toLowerCase().includes(q) ||
+                r.productSegment.toLowerCase().includes(q) ||
+                (r.product && r.product.toLowerCase().includes(q));
+              if (!matches) return false;
+            }
+            return true;
+          })
+          .map(r => r.customer)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters.financialYears, filters.segments, filters.products, filters.searchTerm]);
 
   // Dynamic Financial Year Breakdown with YoY Growth & Quantity Growth Calculation
   const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
@@ -775,6 +885,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         outsideReportingPeriodRecords,
         availableReportingFYs,
         availableFinancialYears,
+        availableSegments,
+        availableProducts,
+        availableCustomers,
         financialYearBreakdown,
         selectedProduct,
         setSelectedProduct,

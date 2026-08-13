@@ -33,7 +33,7 @@ export const DataQualityPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Reporting Financial Year Audit Card */}
+      {/* Financial Year Audit Card */}
       <div className="bg-white dark:bg-slate-900 border border-brand-300 dark:border-brand-800/60 rounded-2xl p-6 shadow-card space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center space-x-3">
@@ -42,22 +42,23 @@ export const DataQualityPage: React.FC = () => {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Selected Reporting Financial Year:</span>
+                <span>Selected Financial Year:</span>
                 <span className="text-brand-600 dark:text-brand-400">{selectedReportingFY || 'N/A'}</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Reporting Period Bounds: <span className="font-semibold text-slate-700 dark:text-slate-200">{reportingPeriodLabel}</span>
+                Financial Year Bounds: <span className="font-semibold text-slate-700 dark:text-slate-200">{reportingPeriodLabel}</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
-            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Select Reporting FY:</label>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Select FY:</label>
             <select
               value={selectedReportingFY}
               onChange={e => setSelectedReportingFY(e.target.value)}
               className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-brand-600 dark:text-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
+              <option value="">All Years</option>
               {availableReportingFYs.map(fy => (
                 <option key={fy} value={fy}>
                   {fy}
@@ -75,14 +76,14 @@ export const DataQualityPage: React.FC = () => {
             </p>
           </div>
           <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/60 dark:border-emerald-800/60">
-            <p className="text-emerald-700 dark:text-emerald-300 font-medium">Valid In-Period Records</p>
+            <p className="text-emerald-700 dark:text-emerald-300 font-medium">Valid In-FY Records</p>
             <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
               {filteredRecords.length.toLocaleString()}
             </p>
             <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">Participating in Main Analytics</p>
           </div>
           <div className={`p-3.5 rounded-xl border ${outsideReportingPeriodRecords.length > 0 ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200/60 dark:border-amber-800/60' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60'}`}>
-            <p className="text-amber-700 dark:text-amber-300 font-medium">Outside Reporting Period Records</p>
+            <p className="text-amber-700 dark:text-amber-300 font-medium">Outside Financial Year Records</p>
             <p className="text-base font-bold text-amber-600 dark:text-amber-400 mt-1">
               {outsideReportingPeriodRecords.length}
             </p>
@@ -94,7 +95,7 @@ export const DataQualityPage: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-300 flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
             <span>
-              <strong>{outsideReportingPeriodRecords.length} record(s)</strong> fall outside the selected reporting period ({reportingPeriodLabel}).
+              <strong>{outsideReportingPeriodRecords.length} record(s)</strong> fall outside the selected financial year ({reportingPeriodLabel}).
             </span>
           </div>
         )}

@@ -62,17 +62,19 @@ export function calculateFinancialYear(dateObj: Date) {
 }
 
 export function parseExcelDateOnly(rawVal: any): { isoDate: string; year: number; month: number; day: number; fyDetails: ReturnType<typeof calculateFinancialYearFromYMD> } {
-  let yyyy = 2025;
-  let mmNum = 4;
-  let ddNum = 1;
+  let yyyy = 0;
+  let mmNum = 0;
+  let ddNum = 0;
+  let hasValidDate = false;
 
   if (typeof rawVal === 'number') {
     // 1. Excel Serial Number (e.g. 45748 -> 2025-04-01, 45749 -> 2025-04-02, 46112 -> 2026-03-31)
     const parsed = XLSX.SSF.parse_date_code(rawVal);
-    if (parsed) {
+    if (parsed && parsed.y && parsed.m && parsed.d) {
       yyyy = parsed.y;
       mmNum = parsed.m;
       ddNum = parsed.d;
+      hasValidDate = true;
     }
   } else {
     // 2. String value parsing (e.g. "01-Apr-2025", "1-Apr-25", "2025-04-01", "23-Jan-2025")
@@ -81,26 +83,57 @@ export function parseExcelDateOnly(rawVal: any): { isoDate: string; year: number
       const parts = str.split(/[-/\s.]/);
       if (parts.length === 3) {
         const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-        let d = parseInt(parts[0], 10);
-        let mStr = parts[1].toLowerCase();
-        let y = parseInt(parts[2], 10);
+        let d = 0;
+        let m = 0;
+        let y = 0;
 
-        let m = monthNames.findIndex(mn => mStr.startsWith(mn)) + 1;
-        if (m === 0 && !isNaN(parseInt(parts[1], 10))) {
-          m = parseInt(parts[1], 10);
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD or YYYY-MMM-DD
+          y = parseInt(parts[0], 10);
+          let mStr = parts[1].toLowerCase();
+          m = monthNames.findIndex(mn => mStr.startsWith(mn)) + 1;
+          if (m === 0 && !isNaN(parseInt(parts[1], 10))) {
+            m = parseInt(parts[1], 10);
+          }
+          d = parseInt(parts[2], 10);
+        } else {
+          // DD-MMM-YYYY or DD-MM-YYYY
+          d = parseInt(parts[0], 10);
+          let mStr = parts[1].toLowerCase();
+          m = monthNames.findIndex(mn => mStr.startsWith(mn)) + 1;
+          if (m === 0 && !isNaN(parseInt(parts[1], 10))) {
+            m = parseInt(parts[1], 10);
+          }
+          y = parseInt(parts[2], 10);
+          if (y < 100) {
+            y = y >= 50 ? 1900 + y : 2000 + y;
+          }
         }
 
-        if (y < 100) {
-          y = y >= 50 ? 1900 + y : 2000 + y;
-        }
-
-        if (!isNaN(d) && m >= 1 && m <= 12 && !isNaN(y)) {
+        if (!isNaN(d) && d >= 1 && d <= 31 && m >= 1 && m <= 12 && !isNaN(y) && y >= 1900 && y <= 2100) {
           yyyy = y;
           mmNum = m;
           ddNum = d;
+          hasValidDate = true;
         }
       }
     }
+  }
+
+  if (!hasValidDate) {
+    return {
+      isoDate: '',
+      year: 0,
+      month: 0,
+      day: 0,
+      fyDetails: {
+        financialYear: 'FY Unknown',
+        year: 0,
+        month: 'Unknown',
+        quarter: 'N/A',
+        monthSortKey: 0,
+      },
+    };
   }
 
   const mm = String(mmNum).padStart(2, '0');

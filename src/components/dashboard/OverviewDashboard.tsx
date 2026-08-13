@@ -58,17 +58,15 @@ export const OverviewDashboard: React.FC = () => {
     setSelectedReportingFY,
     reportingPeriodLabel,
     availableReportingFYs,
+    availableSegments,
+    availableProducts,
+    availableCustomers,
   } = useAnalytics();
 
   const [trendView, setTrendView] = useState<'monthly' | 'quarterly'>('monthly');
   const [segmentChartType, setSegmentChartType] = useState<'bar' | 'donut'>('donut');
   const [productMetricType, setProductMetricType] = useState<'sales' | 'quantity'>('sales');
   const [quarterMetricType, setQuarterMetricType] = useState<'sales' | 'quantity' | 'customers'>('sales');
-
-  // Available unique segments, products, customers for filter dropdowns
-  const availableSegments = useMemo(() => Array.from(new Set(allRecords.map(r => r.productSegment).filter(Boolean))), [allRecords]);
-  const availableProducts = useMemo(() => Array.from(new Set(allRecords.map(r => r.product || r.description).filter(Boolean))), [allRecords]);
-  const availableCustomers = useMemo(() => Array.from(new Set(allRecords.map(r => r.customer).filter(Boolean))), [allRecords]);
 
   // Helper formatting INR
   const formatCurrency = (val: number) => {
@@ -121,39 +119,17 @@ export const OverviewDashboard: React.FC = () => {
           <span>Global Search & Filter Controls</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-          {/* Reporting Financial Year Selector */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Financial Year Selector */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Reporting FY</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Financial Year</label>
             <select
               value={selectedReportingFY}
               onChange={e => setSelectedReportingFY(e.target.value)}
               className="w-full text-xs px-3 py-2 rounded-lg border border-brand-300 dark:border-brand-800 bg-brand-50/50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-extrabold text-brand-600 dark:text-brand-400"
             >
+              <option value="">All Years</option>
               {availableReportingFYs.map(fy => (
-                <option key={fy} value={fy}>
-                  {fy}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Transaction FY Filter */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Transaction FY</label>
-            <select
-              value={filters.financialYears[0] || ''}
-              onChange={e => {
-                if (e.target.value) {
-                  setFilter('financialYears', [e.target.value]);
-                } else {
-                  setFilter('financialYears', []);
-                }
-              }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold"
-            >
-              <option value="">All Transaction FYs ({availableFinancialYears.length})</option>
-              {availableFinancialYears.map(fy => (
                 <option key={fy} value={fy}>
                   {fy}
                 </option>
@@ -415,21 +391,21 @@ export const OverviewDashboard: React.FC = () => {
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <button
-                onClick={() => setFilter('financialYears', [])}
+                onClick={() => setSelectedReportingFY('')}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  filters.financialYears.length === 0
+                  !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years'
                     ? 'bg-brand-600 text-white shadow-sm'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                 }`}
               >
                 All Years ({availableFinancialYears.length})
               </button>
-              {availableFinancialYears.map(fy => (
+              {availableReportingFYs.map(fy => (
                 <button
                   key={fy}
-                  onClick={() => toggleFinancialYearFilter(fy)}
+                  onClick={() => setSelectedReportingFY(fy)}
                   className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    filters.financialYears.includes(fy)
+                    selectedReportingFY === fy
                       ? 'bg-brand-600 text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                   }`}
@@ -443,11 +419,11 @@ export const OverviewDashboard: React.FC = () => {
           {/* Financial Year Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {financialYearBreakdown.map(item => {
-              const isSelected = filters.financialYears.length === 0 || filters.financialYears.includes(item.financialYear);
+              const isSelected = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years' || selectedReportingFY === item.financialYear;
               return (
                 <div
                   key={item.financialYear}
-                  onClick={() => toggleFinancialYearFilter(item.financialYear)}
+                  onClick={() => setSelectedReportingFY(item.financialYear)}
                   className={`cursor-pointer rounded-xl p-4 border transition-all ${
                     isSelected
                       ? 'bg-gradient-to-br from-white to-brand-50/30 dark:from-slate-900 dark:to-brand-950/20 border-brand-300 dark:border-brand-800 shadow-md'

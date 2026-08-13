@@ -62,7 +62,7 @@ export const DataQualitySummary: React.FC = () => {
             <div>
               <div className="inline-flex items-center space-x-2 text-brand-400 text-xs font-bold uppercase tracking-wider mb-1">
                 <Calendar className="w-4 h-4" />
-                <span>Selected Reporting Financial Year</span>
+                <span>Selected Financial Year</span>
               </div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-3">
                 <span>{selectedReportingFY || 'N/A'}</span>
@@ -73,12 +73,13 @@ export const DataQualitySummary: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-3">
-              <label className="text-xs text-slate-400 font-semibold whitespace-nowrap">Reporting FY:</label>
+              <label className="text-xs text-slate-400 font-semibold whitespace-nowrap">Financial Year:</label>
               <select
                 value={selectedReportingFY}
                 onChange={e => setSelectedReportingFY(e.target.value)}
                 className="px-3.5 py-2 rounded-xl bg-slate-900 border border-brand-500/50 text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
+                <option value="">All Years</option>
                 {availableReportingFYs.map(fy => (
                   <option key={fy} value={fy}>
                     {fy}
@@ -94,12 +95,12 @@ export const DataQualitySummary: React.FC = () => {
               <p className="text-lg font-bold text-white mt-1">{allRecords.length.toLocaleString()}</p>
             </div>
             <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60">
-              <p className="text-emerald-300 font-medium">Valid Reporting-Period Records</p>
+              <p className="text-emerald-300 font-medium">Valid In-FY Records</p>
               <p className="text-lg font-bold text-emerald-400 mt-1">{filteredRecords.length.toLocaleString()}</p>
               <p className="text-[10px] text-emerald-400/80 mt-0.5">Participating in Main Analytics</p>
             </div>
             <div className={`p-3.5 rounded-xl border ${outsideReportingPeriodRecords.length > 0 ? 'bg-amber-950/40 border-amber-800/60' : 'bg-slate-900/60 border-slate-700/60'}`}>
-              <p className="text-amber-300 font-medium">Outside Reporting Period Records</p>
+              <p className="text-amber-300 font-medium">Outside Financial Year Records</p>
               <p className="text-lg font-bold text-amber-400 mt-1">{outsideReportingPeriodRecords.length}</p>
               <p className="text-[10px] text-amber-400/80 mt-0.5">Isolated for Data Quality & Audit</p>
             </div>
