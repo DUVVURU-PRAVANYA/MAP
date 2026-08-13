@@ -1,8 +1,4 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const XLSX = require('xlsx');
-import path from 'path';
-import fs from 'fs';
+import * as XLSX from 'xlsx';
 
 interface SampleRecord {
   [key: string]: string | number;
@@ -150,18 +146,6 @@ export function writeSampleExcelFile(outputPath: string) {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'SalesData');
-
-  const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
   XLSX.writeFile(workbook, outputPath);
   console.log(`Generated sample Excel file with ${data.length} records at: ${outputPath}`);
-}
-
-// Execute if run directly
-if (import.meta.url.endsWith(process.argv[1]) || process.argv[1]?.includes('generateSampleData')) {
-  const publicPath = path.join(process.cwd(), 'public', 'sample_sales_dashboard_data.xlsx');
-  writeSampleExcelFile(publicPath);
 }

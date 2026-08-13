@@ -1,6 +1,4 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const XLSX = require('xlsx');
+import * as XLSX from 'xlsx';
 import { CleanSalesRecord, DataQualitySummary, DataValidationRule, RawSalesRecord } from '../src/types/analytics.js';
 
 export const REQUIRED_COLUMNS = [

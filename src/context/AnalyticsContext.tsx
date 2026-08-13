@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
+import { processRawRecords } from '../../server/dataProcessor.js';
+import { generateBusinessInsights } from '../../server/insightsEngine.js';
+import { generateSampleData } from '../../scripts/generateSampleData.js';
 import {
   BusinessInsight,
   CleanSalesRecord,
@@ -9,6 +13,7 @@ import {
   KPIMetrics,
   ProductMetric,
   ProductFamilyMetric,
+  RawSalesRecord,
   SegmentMetric,
   TimeTrendPoint,
   ViewTab,
@@ -207,46 +212,54 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await new Promise(r => setTimeout(r, 600));
       setProcessingStage('Cleaning duplicates and missing attributes...');
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      let data: any = null;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload Excel file');
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          data = await response.json();
+        } else if (contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload Excel file');
+        } else {
+          console.warn(`[UPLOAD DIAGNOSTIC] Backend returned status ${response.status} with non-JSON content-type: ${contentType}`);
+        }
+      } catch (netErr: any) {
+        console.warn('[UPLOAD DIAGNOSTIC] Endpoint upload request error:', netErr?.message || netErr);
+      }
+
+      // Safe client-side fallback: if backend is unavailable or returns HTML/non-JSON, parse directly in browser
+      if (!data || !data.cleanRecords || data.cleanRecords.length === 0) {
+        setProcessingStage('Parsing Excel workbook in-browser...');
+        await new Promise(r => setTimeout(r, 300));
+
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, raw: true });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData: RawSalesRecord[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: true });
+
+        const result = processRawRecords(rawData, file.name);
+        const insights = generateBusinessInsights(result.cleanRecords);
+
+        data = {
+          success: true,
+          filename: result.filename,
+          qualitySummary: result.qualitySummary,
+          cleanRecords: result.cleanRecords,
+          insights,
+        };
       }
 
       setProcessingStage('Generating interactive dashboard & business insights...');
-      await new Promise(r => setTimeout(r, 600));
-
-      const data = await response.json();
+      await new Promise(r => setTimeout(r, 400));
 
       const recs: CleanSalesRecord[] = data.cleanRecords || [];
-      const sortedDates = [...recs].map(r => r.billDate).sort();
-      const minBillDate = sortedDates[0] || 'N/A';
-      const maxBillDate = sortedDates[sortedDates.length - 1] || 'N/A';
-
-      const fyDist: Record<string, number> = {};
-      recs.forEach(r => {
-        fyDist[r.financialYear] = (fyDist[r.financialYear] || 0) + 1;
-      });
-
-      const mar31Recs = recs.filter(r => r.billDate === '2025-03-31');
-      const apr01Recs = recs.filter(r => r.billDate === '2025-04-01');
-
-      console.log('\n[FRONTEND DIAGNOSTIC] Upload HTTP Response received:');
-      console.log('  Status:', response.status);
-      console.log('  Response JSON Keys:', Object.keys(data));
-      console.log('  Response Clean Record Count:', recs.length);
-      console.log('  Response Minimum Bill Date:', minBillDate);
-      console.log('  Response Maximum Bill Date:', maxBillDate);
-      console.log('  Response FY Distribution:', fyDist);
-      console.log('  First 5 Bill Dates:', recs.slice(0, 5).map(r => `${r.id}: ${r.billDate} (${r.financialYear})`));
-      console.log('  Last 5 Bill Dates:', recs.slice(-5).map(r => `${r.id}: ${r.billDate} (${r.financialYear})`));
-      console.log(`  Records with billDate === "2025-03-31": ${mar31Recs.length}`, mar31Recs.slice(0, 5));
-      console.log(`  Records with billDate === "2025-04-01": ${apr01Recs.length}`, apr01Recs.slice(0, 5));
-
       setFilename(data.filename);
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);
@@ -278,15 +291,33 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await new Promise(r => setTimeout(r, 500));
       setProcessingStage('Parsing segments, products, and customers...');
 
-      const response = await fetch('/api/sample');
-      if (!response.ok) {
-        throw new Error('Failed to load sample dataset');
+      let data: any = null;
+      try {
+        const response = await fetch('/api/sample');
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          data = await response.json();
+        }
+      } catch (netErr) {
+        console.warn('[SAMPLE DIAGNOSTIC] Network fetch failed, generating client sample dataset:', netErr);
+      }
+
+      if (!data || !data.cleanRecords) {
+        const rawRecords = generateSampleData(2500);
+        const result = processRawRecords(rawRecords, 'sample_sales_dashboard_data.xlsx');
+        const insights = generateBusinessInsights(result.cleanRecords);
+        data = {
+          success: true,
+          filename: 'sample_sales_dashboard_data.xlsx',
+          qualitySummary: result.qualitySummary,
+          cleanRecords: result.cleanRecords,
+          insights,
+        };
       }
 
       setProcessingStage('Preparing visual analytics dashboard...');
       await new Promise(r => setTimeout(r, 500));
 
-      const data = await response.json();
       setFilename(data.filename);
       setAllRecords(data.cleanRecords);
       setQualitySummary(data.qualitySummary);

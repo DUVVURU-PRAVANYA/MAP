@@ -3,9 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const XLSX = require('xlsx');
+import * as XLSX from 'xlsx';
 
 import { parseAndCleanExcel, processRawRecords } from './dataProcessor.js';
 import { generateBusinessInsights } from './insightsEngine.js';
