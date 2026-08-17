@@ -5,6 +5,7 @@ import { ProcessingAnimation } from './components/upload/ProcessingAnimation';
 import { DataQualitySummary } from './components/upload/DataQualitySummary';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewDashboard } from './components/dashboard/OverviewDashboard';
+import { PlantAnalysis } from './components/pages/PlantAnalysis';
 import { ProductAnalysis } from './components/pages/ProductAnalysis';
 import { CustomerAnalysis } from './components/pages/CustomerAnalysis';
 import { SegmentAnalysis } from './components/pages/SegmentAnalysis';
@@ -25,6 +26,8 @@ const MainContentSwitcher: React.FC = () => {
           <DataTable records={filteredRecords} title="Filtered Active Records" />
         </div>
       );
+    case 'plants':
+      return <PlantAnalysis />;
     case 'products':
       return <ProductAnalysis />;
     case 'customers':

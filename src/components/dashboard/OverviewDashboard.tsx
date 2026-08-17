@@ -38,6 +38,7 @@ export const OverviewDashboard: React.FC = () => {
     kpiMetrics,
     timeTrends,
     segmentBreakdown,
+    plantBreakdown,
     topProducts,
     topCustomers,
     quarterlyBreakdown,
@@ -49,6 +50,8 @@ export const OverviewDashboard: React.FC = () => {
     toggleSegmentFilter,
     toggleProductFilter,
     toggleCustomerFilter,
+    togglePlantFilter,
+    toggleInvoiceNumFilter,
     clearAllFilters,
     allRecords,
     setActiveView,
@@ -61,6 +64,8 @@ export const OverviewDashboard: React.FC = () => {
     availableSegments,
     availableProducts,
     availableCustomers,
+    availablePlants,
+    availableInvoiceNums,
   } = useAnalytics();
 
   const [trendView, setTrendView] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
@@ -68,14 +73,10 @@ export const OverviewDashboard: React.FC = () => {
   const [productMetricType, setProductMetricType] = useState<'sales' | 'quantity'>('sales');
   const [quarterMetricType, setQuarterMetricType] = useState<'sales' | 'quantity' | 'customers'>('sales');
 
-  // Helper formatting INR
+  // Helper formatting INR in Crores (Value In Crs is already in Crores)
   const formatCurrency = (val: number) => {
-    if (val >= 10000000) {
-      return `₹${(val / 10000000).toFixed(2)} Cr`;
-    } else if (val >= 100000) {
-      return `₹${(val / 100000).toFixed(2)} L`;
-    }
-    return `₹${val.toLocaleString('en-IN')}`;
+    if (val === undefined || val === null || isNaN(val)) return '₹0.00 Cr';
+    return `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Cr`;
   };
 
   const SEGMENT_COLORS = ['#0c8de9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
@@ -85,6 +86,8 @@ export const OverviewDashboard: React.FC = () => {
     filters.segments.length > 0 ||
     filters.products.length > 0 ||
     filters.customers.length > 0 ||
+    filters.plants.length > 0 ||
+    filters.invoiceNums.length > 0 ||
     filters.searchTerm !== '';
 
   return (
@@ -94,7 +97,7 @@ export const OverviewDashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Sales Overview</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Financial Year Performance & Real-time Analytics
+            Financial Year Performance & Real-time Analytics (Value in Crores)
           </p>
         </div>
 
@@ -119,7 +122,7 @@ export const OverviewDashboard: React.FC = () => {
           <span>Global Search & Filter Controls</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
           {/* Financial Year Selector */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Financial Year</label>
@@ -137,12 +140,34 @@ export const OverviewDashboard: React.FC = () => {
             </select>
           </div>
 
-          {/* Search Term */}
+          {/* Plant Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Plant Location</label>
+            <select
+              value={filters.plants[0] || ''}
+              onChange={e => {
+                if (e.target.value) {
+                  setFilter('plants', [e.target.value]);
+                } else {
+                  setFilter('plants', []);
+                }
+              }}
+              className="w-full text-xs px-3 py-2 rounded-lg border border-brand-300 dark:border-brand-800 bg-brand-50/30 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-bold"
+            >
+              <option value="">All Plants</option>
+              <option value="Chennai">Chennai (3000)</option>
+              <option value="Hyderabad">Hyderabad (3100)</option>
+              <option value="Pondicherry">Pondicherry (3200)</option>
+              <option value="Trichy">Trichy (3600)</option>
+            </select>
+          </div>
+
+          {/* Search Keywords */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Search Keywords</label>
             <input
               type="text"
-              placeholder="Search product, customer..."
+              placeholder="Search product, customer, invoice..."
               value={filters.searchTerm}
               onChange={e => setFilter('searchTerm', e.target.value)}
               className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -197,7 +222,7 @@ export const OverviewDashboard: React.FC = () => {
 
           {/* Customer Filter */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Customer</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Customer Account</label>
             <select
               value={filters.customers[0] || ''}
               onChange={e => {
@@ -223,6 +248,28 @@ export const OverviewDashboard: React.FC = () => {
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <span className="text-[11px] font-bold text-slate-400">ACTIVE FILTERS:</span>
+            {filters.plants.map(plant => (
+              <span
+                key={plant}
+                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+              >
+                <span>Plant: {plant}</span>
+                <button onClick={() => togglePlantFilter(plant)} className="hover:text-red-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            {filters.invoiceNums.map(inv => (
+              <span
+                key={inv}
+                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+              >
+                <span>Invoice: {inv}</span>
+                <button onClick={() => toggleInvoiceNumFilter(inv)} className="hover:text-red-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
             {filters.segments.map(seg => (
               <span
                 key={seg}
@@ -279,17 +326,17 @@ export const OverviewDashboard: React.FC = () => {
         {/* KPI 1: Total Sales Value */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Sales Value</span>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Sales (Cr)</span>
             <div className="p-1.5 rounded-lg bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400">
               <IndianRupee className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate" title={`Value in Crores: ${formatCurrency(kpiMetrics.totalSalesValue)}`}>
             {formatCurrency(kpiMetrics.totalSalesValue)}
           </p>
           <div className="flex items-center space-x-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
             <ArrowUpRight className="w-3 h-3" />
-            <span>Revenue</span>
+            <span>Value In Crs</span>
           </div>
         </div>
 
@@ -307,10 +354,10 @@ export const OverviewDashboard: React.FC = () => {
           <p className="text-[10px] text-slate-400 mt-1">Primary Quantity</p>
         </div>
 
-        {/* KPI 3: Active Customers */}
+        {/* KPI 3: Customer Count (Distinct Master Customer Group) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Customers</span>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Customer Count</span>
             <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
               <Users className="w-3.5 h-3.5" />
             </div>
@@ -318,7 +365,9 @@ export const OverviewDashboard: React.FC = () => {
           <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
             {kpiMetrics.customerCount}
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">Active Accounts</p>
+          <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-1 font-semibold truncate" title="Distinct Master Customer Groups">
+            Master Groups ({kpiMetrics.individualCustomerCount} Accounts)
+          </p>
         </div>
 
         {/* KPI 4: Product SKUs */}
@@ -518,6 +567,60 @@ export const OverviewDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plant-Wise Analysis Card */}
+      {plantBreakdown.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-xl p-5 shadow-card space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-amber-500" />
+                <span>Plant-Wise Sales Contribution & Performance</span>
+              </h3>
+              <p className="text-xs text-slate-500">Sales breakdown across manufacturing plants (Chennai 3000, Hyderabad 3100, Pondicherry 3200, Trichy 3600)</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {plantBreakdown.map(plant => (
+              <div
+                key={plant.plantCode}
+                onClick={() => togglePlantFilter(plant.plantName)}
+                className={`cursor-pointer rounded-xl p-4 border transition-all ${
+                  filters.plants.includes(plant.plantName) || filters.plants.includes(plant.plantCode)
+                    ? 'bg-amber-50/60 dark:bg-amber-950/40 border-amber-400 dark:border-amber-700 shadow-md ring-2 ring-amber-500/20'
+                    : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-amber-300'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-black text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950 px-2.5 py-0.5 rounded-full">
+                    {plant.plantName} ({plant.plantCode})
+                  </span>
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                    {plant.percentage}% Share
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] text-slate-400 font-medium">Sales Value</p>
+                  <p className="text-lg font-black text-slate-900 dark:text-white">
+                    {formatCurrency(plant.sales)}
+                  </p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800 grid grid-cols-2 gap-1 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block">Inv Quantity</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{plant.quantity.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">Customers</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{plant.customerCount}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

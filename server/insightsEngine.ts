@@ -35,8 +35,8 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
         id: 'insight-fy-yoy-growth',
         type: isGrowth ? 'growth' : 'decline',
         title: isGrowth ? '📈 Multi-Year Financial Revenue Growth' : '📉 Financial Year Revenue Contraction',
-        observation: `Sales ${isGrowth ? 'increased' : 'decreased'} by ${Math.abs(yoyPct)}% in ${currFY} (₹${(currSales / 100000).toFixed(1)} Lakhs) compared with ${prevFY} (₹${(prevSales / 100000).toFixed(1)} Lakhs).`,
-        question: `Which specific product segments and customer accounts drove the ${Math.abs(yoyPct)}% performance variance between ${prevFY} and ${currFY}?`,
+        observation: `Sales ${isGrowth ? 'increased' : 'decreased'} by ${Math.abs(yoyPct)}% in ${currFY} (₹${currSales.toFixed(2)} Cr) compared with ${prevFY} (₹${prevSales.toFixed(2)} Cr).`,
+        question: `Which specific product segments, plant locations, and customer accounts drove the ${Math.abs(yoyPct)}% performance variance between ${prevFY} and ${currFY}?`,
         severity: isGrowth ? 'success' : 'alert',
         affectedContext: {
           period: currFY,
@@ -61,7 +61,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       id: 'insight-top-segment',
       type: 'top_performer',
       title: '🏆 Leading Vehicle Segment Contribution',
-      observation: `The "${topSegName}" vehicle segment generates the highest sales value, accounting for ${topSegPct}% (₹${(topSegSales / 100000).toFixed(1)} Lakhs) of total revenue.`,
+      observation: `The "${topSegName}" vehicle segment generates the highest sales value, accounting for ${topSegPct}% (₹${topSegSales.toFixed(2)} Cr) of total revenue.`,
       question: `How dependent is total business performance on ${topSegName}, and what expansion strategies should be explored across secondary vehicle segments?`,
       severity: 'success',
       affectedContext: {
@@ -86,7 +86,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       id: 'insight-customer-concentration',
       type: 'concentration',
       title: '👥 High Customer Revenue Concentration',
-      observation: `The top 5 customers account for ${top5Pct}% of total sales value. Key account "${topCustomer}" represents ${Math.round((sortedCustomers[0][1] / totalSales) * 100)}% of overall revenue.`,
+      observation: `The top 5 customer accounts generate ${top5Pct}% of total sales. Key account "${topCustomer}" represents ${Math.round((sortedCustomers[0][1] / totalSales) * 100)}% of overall revenue.`,
       question: `Which customer contracts are due for review, and what trade promotion incentives can minimize customer churn risk in key accounts?`,
       severity: top5Pct > 50 ? 'warning' : 'info',
       affectedContext: {
@@ -113,8 +113,8 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       id: 'insight-top-product',
       type: 'top_performer',
       title: '🌟 Top Performing Material Code',
-      observation: `"${topProduct.description}" is the highest revenue generating product, bringing in ₹${(topProduct.sales / 100000).toFixed(1)} Lakhs (${topProdPct}% share).`,
-      question: `Are inventory stock levels and distribution channels optimized to prevent stockouts for ${topProduct.description}?`,
+      observation: `"${topProduct.description}" is the highest revenue generating product, bringing in ₹${topProduct.sales.toFixed(2)} Cr (${topProdPct}% share).`,
+      question: `Are manufacturing plant allocations and inventory distribution channels optimized to prevent stockouts for ${topProduct.description}?`,
       severity: 'success',
       affectedContext: {
         product: topProduct.description,
@@ -144,7 +144,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
         id: 'insight-quarterly-shift',
         type: isGrowth ? 'growth' : 'decline',
         title: isGrowth ? '📈 Quarterly Revenue Acceleration' : '📉 Quarterly Revenue Contraction',
-        observation: `Sales ${isGrowth ? 'grew' : 'declined'} by ${Math.abs(pctChange)}% between ${firstQ} (₹${(firstQVal / 100000).toFixed(1)}L) and ${lastQ} (₹${(lastQVal / 100000).toFixed(1)}L).`,
+        observation: `Sales ${isGrowth ? 'grew' : 'declined'} by ${Math.abs(pctChange)}% between ${firstQ} (₹${firstQVal.toFixed(2)} Cr) and ${lastQ} (₹${lastQVal.toFixed(2)} Cr).`,
         question: `Which product lines or regional accounts drove the ${Math.abs(pctChange)}% variance in ${lastQ}?`,
         severity: isGrowth ? 'success' : 'alert',
         affectedContext: {
@@ -164,7 +164,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       id: 'insight-underperforming-segment',
       type: 'decline',
       title: '⚠ Underperforming Vehicle Segment',
-      observation: `The "${worstSegName}" vehicle segment generates only ${worstSegPct}% (₹${(worstSegSales / 100000).toFixed(1)} Lakhs) of total sales value.`,
+      observation: `The "${worstSegName}" vehicle segment generates only ${worstSegPct}% (₹${worstSegSales.toFixed(2)} Cr) of total sales value.`,
       question: `What targeted pricing, packaging, or promotion support is required to revive sales velocity in ${worstSegName}?`,
       severity: 'warning',
       affectedContext: {

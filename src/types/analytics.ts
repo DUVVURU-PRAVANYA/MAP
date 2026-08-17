@@ -1,15 +1,23 @@
 export interface RawSalesRecord {
   'Cust Num.'?: string | number;
   'Customer'?: string;
+  'Customer Group'?: string;
+  'Master Customer Group'?: string;
   'Material code'?: string | number;
   'Description'?: string;
   'Bill Date'?: string | number | Date;
   'Inv. Qty'?: string | number;
   'Sale value (Doc rate)'?: string | number;
+  'Value In Crs'?: string | number;
   'Sale qty in nos'?: string | number;
   'Product'?: string;
   'Product Segment'?: string;
   'Segment'?: string;
+  'Plant'?: string | number;
+  'Plant Code'?: string | number;
+  'Invoice Num.'?: string | number;
+  'Invoice Num'?: string | number;
+  'Invoice Number'?: string | number;
   [key: string]: any;
 }
 
@@ -17,6 +25,8 @@ export interface CleanSalesRecord {
   id: string;
   custNum: string;
   customer: string;
+  customerGroup: string;
+  masterCustomerGroup: string;
   materialCode: string;
   description: string;
   product?: string;
@@ -27,9 +37,13 @@ export interface CleanSalesRecord {
   year: number; // e.g. 2025
   financialYear: string; // e.g. "FY 2024-25"
   invQty: number;
-  saleValue: number;
+  saleValue: number; // Value in Crores directly
+  valueInCrs: number; // Value in Crores
   saleQty: number;
   productSegment: string;
+  plantCode: string; // e.g. '3000'
+  plantName: string; // e.g. 'Chennai'
+  invoiceNum: string; // e.g. 'INV-500101'
   isFlagged?: boolean;
   flagReason?: string;
 }
@@ -46,6 +60,33 @@ export interface FinancialYearMetric {
   yoyGrowthPct?: number | null;
   prevQuantity?: number;
   qtyGrowthPct?: number | null;
+}
+
+export interface PlantMetric {
+  plantCode: string;
+  plantName: string;
+  sales: number;
+  quantity: number;
+  customerCount: number;
+  productCount: number;
+  transactionCount: number;
+  percentage: number;
+  rank: number;
+}
+
+export interface CustomerHierarchyMetric {
+  key: string;
+  name: string;
+  level: 'master' | 'group' | 'customer';
+  sales: number;
+  quantity: number;
+  productCount: number;
+  plantCount: number;
+  transactionCount: number;
+  percentage: number;
+  rank: number;
+  masterCustomerGroup?: string;
+  customerGroup?: string;
 }
 
 export interface DataValidationRule {
@@ -79,16 +120,25 @@ export interface FilterState {
   segments: string[];
   products: string[];
   customers: string[];
+  customerGroups: string[];
+  masterCustomerGroups: string[];
+  plants: string[];
+  invoiceNums: string[];
   searchTerm: string;
 }
 
 export interface KPIMetrics {
-  totalSalesValue: number;
+  totalSalesValue: number; // In Crores
   totalInvQty: number;
   totalSaleQty: number;
-  customerCount: number;
+  customerCount: number; // Distinct Master Customer Group Count
+  individualCustomerCount: number;
+  customerGroupCount: number;
+  masterCustomerGroupCount: number;
   productCount: number;
   segmentCount: number;
+  plantCount: number;
+  invoiceCount: number;
   transactionCount: number;
   avgSalesValue: number;
   prevPeriodDiffSalesValue?: number; // % change vs prior period
@@ -142,11 +192,14 @@ export interface ProductMetric {
 export interface CustomerMetric {
   custNum: string;
   customer: string;
+  customerGroup?: string;
+  masterCustomerGroup?: string;
   sales: number;
   quantity: number;
   transactionCount: number;
   productCount: number;
   segmentCount: number;
+  plantCount?: number;
   rank: number;
 }
 
@@ -161,6 +214,7 @@ export interface BusinessInsight {
     segment?: string;
     product?: string;
     customer?: string;
+    plant?: string;
     period?: string;
     salesChangePct?: number;
   };
@@ -171,6 +225,7 @@ export type ViewTab =
   | 'processing'
   | 'quality_summary'
   | 'overview'
+  | 'plants'
   | 'products'
   | 'customers'
   | 'segments'

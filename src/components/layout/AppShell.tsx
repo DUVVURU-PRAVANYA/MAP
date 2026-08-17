@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   LayoutDashboard,
+  Factory,
   Package,
   Users,
   PieChart,
@@ -37,6 +38,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setSelectedReportingFY,
     reportingPeriodLabel,
     availableReportingFYs,
+    filters,
+    setFilter,
   } = useAnalytics();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -45,6 +48,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const navItems: { id: ViewTab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'overview', label: 'Sales Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'plants', label: 'Plant Analysis', icon: <Factory className="w-5 h-5" /> },
     { id: 'products', label: 'Products', icon: <Package className="w-5 h-5" /> },
     { id: 'customers', label: 'Customers', icon: <Users className="w-5 h-5" /> },
     { id: 'segments', label: 'Vehicle Segments', icon: <PieChart className="w-5 h-5" /> },
@@ -170,11 +174,35 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
+            {/* Plant Selector */}
+            {allRecords.length > 0 && (
+              <div className="hidden md:flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Plant:</span>
+                <select
+                  value={filters.plants[0] || ''}
+                  onChange={e => {
+                    if (e.target.value) {
+                      setFilter('plants', [e.target.value]);
+                    } else {
+                      setFilter('plants', []);
+                    }
+                  }}
+                  className="bg-transparent text-xs font-bold text-brand-600 dark:text-brand-400 focus:outline-none cursor-pointer"
+                >
+                  <option value="" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Plants</option>
+                  <option value="Chennai" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Chennai (3000)</option>
+                  <option value="Hyderabad" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Hyderabad (3100)</option>
+                  <option value="Pondicherry" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Pondicherry (3200)</option>
+                  <option value="Trichy" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Trichy (3600)</option>
+                </select>
+              </div>
+            )}
+
             {/* Financial Year Selector */}
             {selectedReportingFY && (
               <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 border border-brand-300 dark:border-brand-800">
                 <Calendar className="w-3.5 h-3.5 text-brand-500" />
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Financial Year:</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">FY:</span>
                 <select
                   value={selectedReportingFY}
                   onChange={e => setSelectedReportingFY(e.target.value)}

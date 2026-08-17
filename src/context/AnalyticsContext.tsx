@@ -11,6 +11,7 @@ import {
   FilterState,
   FinancialYearMetric,
   KPIMetrics,
+  PlantMetric,
   ProductMetric,
   ProductFamilyMetric,
   RawSalesRecord,
@@ -93,6 +94,10 @@ interface AnalyticsContextType {
   toggleSegmentFilter: (segment: string) => void;
   toggleProductFilter: (product: string) => void;
   toggleCustomerFilter: (customer: string) => void;
+  togglePlantFilter: (plant: string) => void;
+  toggleInvoiceNumFilter: (inv: string) => void;
+  toggleCustomerGroupFilter: (cg: string) => void;
+  toggleMasterCustomerGroupFilter: (mcg: string) => void;
   clearAllFilters: () => void;
   investigateInsight: (insight: BusinessInsight) => void;
   popBreadcrumb: (index: number) => void;
@@ -106,12 +111,17 @@ interface AnalyticsContextType {
   availableSegments: string[];
   availableProducts: string[];
   availableCustomers: string[];
+  availableCustomerGroups: string[];
+  availableMasterCustomerGroups: string[];
+  availablePlants: string[];
+  availableInvoiceNums: string[];
 
   // Derived Metrics
   kpiMetrics: KPIMetrics;
   timeTrends: TimeTrendPoint[];
   segmentBreakdown: SegmentMetric[];
   productFamilyBreakdown: ProductFamilyMetric[];
+  plantBreakdown: PlantMetric[];
   topProducts: ProductMetric[];
   topCustomers: CustomerMetric[];
   quarterlyBreakdown: { quarter: string; sales: number; quantity: number; customers: number }[];
@@ -123,6 +133,10 @@ const initialFilters: FilterState = {
   segments: [],
   products: [],
   customers: [],
+  customerGroups: [],
+  masterCustomerGroups: [],
+  plants: [],
+  invoiceNums: [],
   searchTerm: '',
 };
 
@@ -390,6 +404,38 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
+  const togglePlantFilter = (plant: string) => {
+    setFilters(prev => {
+      const exists = prev.plants.includes(plant);
+      const nextPlants = exists ? prev.plants.filter(p => p !== plant) : [...prev.plants, plant];
+      return { ...prev, plants: nextPlants };
+    });
+  };
+
+  const toggleInvoiceNumFilter = (inv: string) => {
+    setFilters(prev => {
+      const exists = prev.invoiceNums.includes(inv);
+      const nextInvoiceNums = exists ? prev.invoiceNums.filter(i => i !== inv) : [...prev.invoiceNums, inv];
+      return { ...prev, invoiceNums: nextInvoiceNums };
+    });
+  };
+
+  const toggleCustomerGroupFilter = (cg: string) => {
+    setFilters(prev => {
+      const exists = prev.customerGroups.includes(cg);
+      const nextCGs = exists ? prev.customerGroups.filter(c => c !== cg) : [...prev.customerGroups, cg];
+      return { ...prev, customerGroups: nextCGs };
+    });
+  };
+
+  const toggleMasterCustomerGroupFilter = (mcg: string) => {
+    setFilters(prev => {
+      const exists = prev.masterCustomerGroups.includes(mcg);
+      const nextMCGs = exists ? prev.masterCustomerGroups.filter(m => m !== mcg) : [...prev.masterCustomerGroups, mcg];
+      return { ...prev, masterCustomerGroups: nextMCGs };
+    });
+  };
+
   const clearAllFilters = (recordsOverride?: CleanSalesRecord[]) => {
     setFilters({
       dateRange: null,
@@ -397,6 +443,10 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       segments: [],
       products: [],
       customers: [],
+      customerGroups: [],
+      masterCustomerGroups: [],
+      plants: [],
+      invoiceNums: [],
       searchTerm: '',
     });
     setBreadcrumbs([{ label: 'All Sales', type: 'all' }]);
@@ -443,10 +493,13 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (ctx.customer) {
       toggleCustomerFilter(ctx.customer);
     }
+    if (ctx.plant) {
+      togglePlantFilter(ctx.plant);
+    }
     setActiveView('overview');
   };
 
-  // Compute Filtered Records strictly scoped to Selected Financial Year
+  // Compute Filtered Records strictly scoped to Selected Financial Year & Active Filters
   const filteredRecords = useMemo(() => {
     const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
     return allRecords.filter(r => {
@@ -457,6 +510,18 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return false;
       }
       if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) {
+        return false;
+      }
+      if (filters.plants.length > 0 && !filters.plants.includes(r.plantCode) && !filters.plants.includes(r.plantName)) {
+        return false;
+      }
+      if (filters.invoiceNums.length > 0 && !filters.invoiceNums.includes(r.invoiceNum)) {
+        return false;
+      }
+      if (filters.customerGroups.length > 0 && !filters.customerGroups.includes(r.customerGroup)) {
+        return false;
+      }
+      if (filters.masterCustomerGroups.length > 0 && !filters.masterCustomerGroups.includes(r.masterCustomerGroup)) {
         return false;
       }
       if (filters.products.length > 0) {
@@ -477,9 +542,13 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const q = filters.searchTerm.toLowerCase();
         const matches =
           r.customer.toLowerCase().includes(q) ||
+          r.customerGroup.toLowerCase().includes(q) ||
+          r.masterCustomerGroup.toLowerCase().includes(q) ||
           r.description.toLowerCase().includes(q) ||
           r.materialCode.toLowerCase().includes(q) ||
           r.productSegment.toLowerCase().includes(q) ||
+          r.plantName.toLowerCase().includes(q) ||
+          r.invoiceNum.toLowerCase().includes(q) ||
           (r.financialYear && r.financialYear.toLowerCase().includes(q));
         if (!matches) return false;
       }
@@ -553,8 +622,8 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     ).sort();
   }, [allRecords, selectedReportingFY, filters.financialYears, filters.segments, filters.customers, filters.searchTerm]);
 
-  // Dynamic Cross-Filtering Options: Customers available given other active filters
-  const availableCustomers = useMemo(() => {
+  // Dynamic Cross-Filtering Options: Plants available given active filters
+  const availablePlants = useMemo(() => {
     const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
     return Array.from(
       new Set(
@@ -563,95 +632,79 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (!isAll && r.financialYear !== selectedReportingFY) return false;
             if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
             if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
-            if (filters.products.length > 0) {
-              const prodName = `${r.materialCode} - ${r.description}`;
-              const isMatch =
-                filters.products.includes(r.description) ||
-                filters.products.includes(r.materialCode) ||
-                filters.products.includes(prodName) ||
-                (r.product && filters.products.includes(r.product));
-              if (!isMatch) return false;
-            }
-            if (filters.searchTerm) {
-              const q = filters.searchTerm.toLowerCase();
-              const matches =
-                r.customer.toLowerCase().includes(q) ||
-                r.description.toLowerCase().includes(q) ||
-                r.materialCode.toLowerCase().includes(q) ||
-                r.productSegment.toLowerCase().includes(q) ||
-                (r.product && r.product.toLowerCase().includes(q));
-              if (!matches) return false;
-            }
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
             return true;
           })
-          .map(r => r.customer)
+          .map(r => r.plantName)
           .filter(Boolean)
       )
     ).sort();
-  }, [allRecords, selectedReportingFY, filters.financialYears, filters.segments, filters.products, filters.searchTerm]);
+  }, [allRecords, selectedReportingFY, filters]);
 
-  // Dynamic Financial Year Breakdown with YoY Growth & Quantity Growth Calculation
-  const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
-    // Respect active segment/product/customer non-FY filters if applied
-    const baseRecords = allRecords.filter(r => {
-      if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
-      if (filters.products.length > 0) {
-        const prodName = `${r.materialCode} - ${r.description}`;
-        if (!filters.products.includes(r.description) && !filters.products.includes(r.materialCode) && !filters.products.includes(prodName)) {
-          return false;
-        }
+  // Dynamic Cross-Filtering Options: Invoice Nums available given active filters
+  const availableInvoiceNums = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.plants.length > 0 && !filters.plants.includes(r.plantCode) && !filters.plants.includes(r.plantName)) return false;
+            return true;
+          })
+          .map(r => r.invoiceNum)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Customer Groups available
+  const availableCustomerGroups = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.customerGroup).filter(Boolean))).sort();
+  }, [allRecords]);
+
+  // Dynamic Cross-Filtering Options: Master Customer Groups available
+  const availableMasterCustomerGroups = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.masterCustomerGroup).filter(Boolean))).sort();
+  }, [allRecords]);
+
+  // Dynamic Cross-Filtering Options: Individual Customers available
+  const availableCustomers = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.customer).filter(Boolean))).sort();
+  }, [allRecords]);
+
+  // Derived Plant Breakdown
+  const plantBreakdown = useMemo<PlantMetric[]>(() => {
+    const total = filteredRecords.reduce((sum, r) => sum + r.saleValue, 0) || 1;
+    const plantMap: Record<string, { plantCode: string; plantName: string; sales: number; quantity: number; customers: Set<string>; products: Set<string>; transactions: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const code = r.plantCode || '3000';
+      if (!plantMap[code]) {
+        plantMap[code] = { plantCode: code, plantName: r.plantName || 'Chennai', sales: 0, quantity: 0, customers: new Set(), products: new Set(), transactions: 0 };
       }
-      if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
-      return true;
+      plantMap[code].sales += r.saleValue;
+      plantMap[code].quantity += r.invQty;
+      plantMap[code].customers.add(r.masterCustomerGroup || r.customer);
+      plantMap[code].products.add(`${r.materialCode}|||${r.description}`);
+      plantMap[code].transactions += 1;
     });
 
-    const fyMap: Record<string, { sales: number; quantity: number; customers: Set<string>; products: Set<string>; segments: Set<string>; transactions: number }> = {};
-
-    baseRecords.forEach(r => {
-      const fy = r.financialYear || 'FY Unknown';
-      if (!fyMap[fy]) {
-        fyMap[fy] = { sales: 0, quantity: 0, customers: new Set(), products: new Set(), segments: new Set(), transactions: 0 };
-      }
-      fyMap[fy].sales += r.saleValue;
-      fyMap[fy].quantity += r.invQty;
-      fyMap[fy].customers.add(r.customer);
-      fyMap[fy].products.add(`${r.materialCode}|||${r.description}`);
-      fyMap[fy].segments.add(r.productSegment);
-      fyMap[fy].transactions += 1;
-    });
-
-    const sortedFYs = Object.keys(fyMap).sort();
-    return sortedFYs.map((fy, idx) => {
-      const data = fyMap[fy];
-      const prevData = idx > 0 ? fyMap[sortedFYs[idx - 1]] : undefined;
-      const prevSales = prevData?.sales;
-      const prevQuantity = prevData?.quantity;
-
-      let yoyGrowthPct: number | null = null;
-      if (prevSales !== undefined && prevSales > 0) {
-        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
-      }
-
-      let qtyGrowthPct: number | null = null;
-      if (prevQuantity !== undefined && prevQuantity > 0) {
-        qtyGrowthPct = Number((((data.quantity - prevQuantity) / prevQuantity) * 100).toFixed(1));
-      }
-
-      return {
-        financialYear: fy,
+    return Object.values(plantMap)
+      .map(data => ({
+        plantCode: data.plantCode,
+        plantName: data.plantName,
         sales: data.sales,
         quantity: data.quantity,
-        customers: data.customers.size,
-        products: data.products.size,
-        segments: data.segments.size,
-        transactions: data.transactions,
-        prevSales,
-        yoyGrowthPct,
-        prevQuantity,
-        qtyGrowthPct,
-      };
-    });
-  }, [allRecords, filters.segments, filters.products, filters.customers]);
+        customerCount: data.customers.size,
+        productCount: data.products.size,
+        transactionCount: data.transactions,
+        percentage: Number(((data.sales / (total || 1)) * 100).toFixed(1)),
+        rank: 0,
+      }))
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }, [filteredRecords]);
 
   // Derived KPI Metrics
   const kpiMetrics = useMemo<KPIMetrics>(() => {
@@ -661,8 +714,13 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         totalInvQty: 0,
         totalSaleQty: 0,
         customerCount: 0,
+        individualCustomerCount: 0,
+        customerGroupCount: 0,
+        masterCustomerGroupCount: 0,
         productCount: 0,
         segmentCount: 0,
+        plantCount: 0,
+        invoiceCount: 0,
         transactionCount: 0,
         avgSalesValue: 0,
       };
@@ -671,19 +729,32 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const totalSalesValue = filteredRecords.reduce((sum, r) => sum + r.saleValue, 0);
     const totalInvQty = filteredRecords.reduce((sum, r) => sum + r.invQty, 0);
     const totalSaleQty = filteredRecords.reduce((sum, r) => sum + r.saleQty, 0);
-    const customerCount = new Set(filteredRecords.map(r => r.customer)).size;
+
+    // CRITICAL REQUIREMENT: Main Customer Count MUST use DISTINCT Master Customer Group
+    const masterCustomerGroupCount = new Set(filteredRecords.map(r => r.masterCustomerGroup)).size;
+    const customerGroupCount = new Set(filteredRecords.map(r => r.customerGroup)).size;
+    const individualCustomerCount = new Set(filteredRecords.map(r => r.customer)).size;
+    const customerCount = masterCustomerGroupCount;
+
     const productCount = new Set(filteredRecords.map(r => `${r.materialCode}|||${r.description}`)).size;
     const segmentCount = new Set(filteredRecords.map(r => r.productSegment)).size;
+    const plantCount = new Set(filteredRecords.map(r => r.plantCode)).size;
+    const invoiceCount = new Set(filteredRecords.map(r => r.invoiceNum)).size;
     const transactionCount = filteredRecords.length;
-    const avgSalesValue = transactionCount > 0 ? Math.round(totalSalesValue / transactionCount) : 0;
+    const avgSalesValue = transactionCount > 0 ? Number((totalSalesValue / transactionCount).toFixed(3)) : 0;
 
     return {
       totalSalesValue,
       totalInvQty,
       totalSaleQty,
       customerCount,
+      individualCustomerCount,
+      customerGroupCount,
+      masterCustomerGroupCount,
       productCount,
       segmentCount,
+      plantCount,
+      invoiceCount,
       transactionCount,
       avgSalesValue,
       prevPeriodDiffSalesValue: 12.4,
@@ -894,6 +965,63 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
   }, [filteredRecords]);
 
+  // Derived Multi-Financial Year Breakdown
+  const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
+    const fyMap: Record<
+      string,
+      {
+        financialYear: string;
+        sales: number;
+        quantity: number;
+        customers: Set<string>;
+        products: Set<string>;
+        segments: Set<string>;
+        transactions: number;
+      }
+    > = {};
+
+    allRecords.forEach(r => {
+      const fy = r.financialYear || 'FY Unknown';
+      if (!fyMap[fy]) {
+        fyMap[fy] = {
+          financialYear: fy,
+          sales: 0,
+          quantity: 0,
+          customers: new Set(),
+          products: new Set(),
+          segments: new Set(),
+          transactions: 0,
+        };
+      }
+      fyMap[fy].sales += r.saleValue;
+      fyMap[fy].quantity += r.invQty;
+      fyMap[fy].customers.add(r.masterCustomerGroup || r.customer);
+      fyMap[fy].products.add(`${r.materialCode}|||${r.description}`);
+      fyMap[fy].segments.add(r.productSegment);
+      fyMap[fy].transactions += 1;
+    });
+
+    const sortedFYs = Object.keys(fyMap).sort();
+    return sortedFYs.map((fy, idx) => {
+      const data = fyMap[fy];
+      const prevSales = idx > 0 ? fyMap[sortedFYs[idx - 1]].sales : undefined;
+      let yoyGrowthPct: number | null = null;
+      if (prevSales !== undefined && prevSales > 0) {
+        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+      }
+      return {
+        financialYear: data.financialYear,
+        sales: data.sales,
+        quantity: data.quantity,
+        customers: data.customers.size,
+        products: data.products.size,
+        segments: data.segments.size,
+        transactions: data.transactions,
+        yoyGrowthPct,
+      };
+    });
+  }, [allRecords]);
+
   return (
     <AnalyticsContext.Provider
       value={{
@@ -919,6 +1047,10 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         availableSegments,
         availableProducts,
         availableCustomers,
+        availableCustomerGroups,
+        availableMasterCustomerGroups,
+        availablePlants,
+        availableInvoiceNums,
         financialYearBreakdown,
         selectedProduct,
         setSelectedProduct,
@@ -933,6 +1065,10 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toggleSegmentFilter,
         toggleProductFilter,
         toggleCustomerFilter,
+        togglePlantFilter,
+        toggleInvoiceNumFilter,
+        toggleCustomerGroupFilter,
+        toggleMasterCustomerGroupFilter,
         clearAllFilters,
         investigateInsight,
         popBreadcrumb,
@@ -943,6 +1079,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         timeTrends,
         segmentBreakdown,
         productFamilyBreakdown,
+        plantBreakdown,
         topProducts,
         topCustomers,
         quarterlyBreakdown,

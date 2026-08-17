@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Package, Search, Layers, IndianRupee, ShoppingBag, Users, Receipt, ArrowLeftRight, Check, X, TrendingUp } from 'lucide-react';
+import { Package, Search, Layers, IndianRupee, ShoppingBag, Users, Receipt, ArrowLeftRight, Check, X, TrendingUp, Building2, GitFork, UserCheck, Boxes } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
 import { useAnalytics } from '../../context/AnalyticsContext';
 
@@ -15,10 +15,12 @@ export const ProductAnalysis: React.FC = () => {
     setCompareProducts,
     toggleCustomerFilter,
     setActiveView,
+    filters,
   } = useAnalytics();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [productCustomerHierarchyLevel, setProductCustomerHierarchyLevel] = useState<'master' | 'group' | 'customer'>('master');
 
   // Active single product selection (default to top product if none selected)
   const currentProductDesc = selectedProduct || (topProducts[0] ? topProducts[0].description : '');
@@ -67,7 +69,7 @@ export const ProductAnalysis: React.FC = () => {
     });
   }, [allRecords, productMetrics]);
 
-  // Monthly trend for selected product (Chronological April -> March)
+  // Monthly trend for selected product
   const productMonthlyTrend = useMemo(() => {
     if (!productMetrics) return [];
     const map: Record<string, { month: string; sales: number; quantity: number; sortKey: number }> = {};
@@ -114,23 +116,67 @@ export const ProductAnalysis: React.FC = () => {
     });
   }, [filteredRecords, productMetrics]);
 
-  // Top customers buying selected product
-  const productTopCustomers = useMemo(() => {
+  // Product-Wise Plant Distribution
+  const productPlantDistribution = useMemo(() => {
     if (!productMetrics) return [];
-    const map: Record<string, { customer: string; sales: number; quantity: number }> = {};
+    const map: Record<string, { plantName: string; plantCode: string; sales: number; quantity: number }> = {};
 
     filteredRecords
       .filter(r => r.description === productMetrics.description || r.materialCode === productMetrics.materialCode)
       .forEach(r => {
-        if (!map[r.customer]) {
-          map[r.customer] = { customer: r.customer, sales: 0, quantity: 0 };
+        const pCode = r.plantCode || '3000';
+        const pName = r.plantName || 'Chennai';
+        if (!map[pCode]) {
+          map[pCode] = { plantName: pName, plantCode: pCode, sales: 0, quantity: 0 };
         }
-        map[r.customer].sales += r.saleValue;
-        map[r.customer].quantity += r.invQty;
+        map[pCode].sales += r.saleValue;
+        map[pCode].quantity += r.invQty;
       });
 
-    return Object.values(map).sort((a, b) => b.sales - a.sales).slice(0, 6);
+    return Object.values(map).sort((a, b) => b.sales - a.sales);
   }, [filteredRecords, productMetrics]);
+
+  // Requirement 5: Product-Wise Top Contributing Customers across 3 Hierarchy Levels (respecting Plant filters)
+  const productTopCustomerContributors = useMemo(() => {
+    if (!productMetrics) return [];
+    
+    // Filter records for the selected product (filteredRecords ALREADY respects active Plant filters!)
+    const targetRecords = filteredRecords.filter(
+      r => r.description === productMetrics.description || r.materialCode === productMetrics.materialCode
+    );
+
+    const totalProductSales = targetRecords.reduce((sum, r) => sum + r.saleValue, 0) || 1;
+
+    const map: Record<string, { name: string; sales: number; quantity: number; invoices: Set<string>; plants: Set<string> }> = {};
+
+    targetRecords.forEach(r => {
+      let key = r.masterCustomerGroup || r.customer;
+      if (productCustomerHierarchyLevel === 'group') {
+        key = r.customerGroup || r.customer;
+      } else if (productCustomerHierarchyLevel === 'customer') {
+        key = r.customer;
+      }
+
+      if (!map[key]) {
+        map[key] = { name: key, sales: 0, quantity: 0, invoices: new Set(), plants: new Set() };
+      }
+      map[key].sales += r.saleValue;
+      map[key].quantity += r.invQty;
+      map[key].invoices.add(r.invoiceNum);
+      map[key].plants.add(r.plantName);
+    });
+
+    return Object.values(map)
+      .map(c => ({
+        name: c.name,
+        sales: c.sales,
+        quantity: c.quantity,
+        invoiceCount: c.invoices.size,
+        plantCount: c.plants.size,
+        contributionPct: Number(((c.sales / totalProductSales) * 100).toFixed(1)),
+      }))
+      .sort((a, b) => b.sales - a.sales);
+  }, [filteredRecords, productMetrics, productCustomerHierarchyLevel]);
 
   // Comparative metrics data
   const comparisonData = useMemo(() => {
@@ -175,8 +221,8 @@ export const ProductAnalysis: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Product Performance & Family Analysis</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Excel Product Family categories (Disc Pads, Brake Linings, etc.) and Material Code SKU breakdown</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Product Performance & Customer Analysis</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Excel Product Family categories & Product-wise top customer contributor ranking</p>
         </div>
 
         <button
@@ -192,7 +238,7 @@ export const ProductAnalysis: React.FC = () => {
         </button>
       </div>
 
-      {/* Product Family Categories Grid (Excel "Product" Column: 6 Product Families) */}
+      {/* Product Family Categories Grid */}
       {productFamilyBreakdown.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Excel Product Families ({productFamilyBreakdown.length})</h2>
@@ -207,7 +253,7 @@ export const ProductAnalysis: React.FC = () => {
                   <Package className="w-3.5 h-3.5 text-brand-500" />
                 </div>
                 <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{pf.productFamily}</p>
-                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{(pf.sales / 100000).toFixed(1)}L</p>
+                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{pf.sales.toFixed(2)} Cr</p>
                 <p className="text-[10px] text-slate-400">{pf.skuCount} SKUs • {pf.quantity.toLocaleString()} Inv Qty</p>
               </div>
             ))}
@@ -254,7 +300,7 @@ export const ProductAnalysis: React.FC = () => {
                   <div className="space-y-1 pt-2 border-t border-slate-800 text-xs">
                     <div className="flex justify-between text-slate-300">
                       <span>Sales Value:</span>
-                      <span className="font-bold text-emerald-400">₹{(item.sales / 100000).toFixed(1)}L</span>
+                      <span className="font-bold text-emerald-400">₹{item.sales.toFixed(2)} Cr</span>
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span>Invoice Qty:</span>
@@ -314,7 +360,7 @@ export const ProductAnalysis: React.FC = () => {
 
                   <div className="flex items-center space-x-2 shrink-0">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      ₹{(prod.sales / 100000).toFixed(1)}L
+                      ₹{prod.sales.toFixed(2)} Cr
                     </span>
                     <button
                       onClick={e => {
@@ -363,7 +409,7 @@ export const ProductAnalysis: React.FC = () => {
                 <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
                   <p className="text-[11px] text-slate-400 font-medium">Sales Revenue</p>
                   <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                    ₹{(productMetrics.sales / 100000).toFixed(2)} Lakhs
+                    ₹{productMetrics.sales.toFixed(2)} Cr
                   </p>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
@@ -387,7 +433,122 @@ export const ProductAnalysis: React.FC = () => {
               </div>
             </div>
 
-            {/* Product Performance across Financial Years (Section 7 & 10) */}
+            {/* Requirement 5: Product-Wise Customer Analysis (3-Level Customer Hierarchy) */}
+            <div className="bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-900/40 rounded-2xl p-6 shadow-card space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    <span>Top Contributing Customers for "{productMetrics.description}"</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">Ranked by SUM(Value In Crs) descending • Respects active Plant filters</p>
+                </div>
+
+                {/* 3-Level Customer Hierarchy Selector */}
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button
+                    onClick={() => setProductCustomerHierarchyLevel('master')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      productCustomerHierarchyLevel === 'master'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    Master Group
+                  </button>
+                  <button
+                    onClick={() => setProductCustomerHierarchyLevel('group')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      productCustomerHierarchyLevel === 'group'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    Customer Group
+                  </button>
+                  <button
+                    onClick={() => setProductCustomerHierarchyLevel('customer')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      productCustomerHierarchyLevel === 'customer'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    Customer Account
+                  </button>
+                </div>
+              </div>
+
+              {/* Contributor Customer Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+                  <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="py-2.5 px-3">Rank</th>
+                      <th className="py-2.5 px-3">
+                        {productCustomerHierarchyLevel === 'master'
+                          ? 'Master Customer Group'
+                          : productCustomerHierarchyLevel === 'group'
+                          ? 'Customer Group'
+                          : 'Customer Account'}
+                      </th>
+                      <th className="py-2.5 px-3 text-right">Contribution Sales (Cr)</th>
+                      <th className="py-2.5 px-3 text-right">Product Share %</th>
+                      <th className="py-2.5 px-3 text-right">Qty Purchased</th>
+                      <th className="py-2.5 px-3 text-center">Invoices</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {productTopCustomerContributors.map((c, idx) => (
+                      <tr key={c.name} className="hover:bg-purple-50/40 dark:hover:bg-purple-950/30">
+                        <td className="py-2.5 px-3 font-bold text-slate-400">#{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          {productCustomerHierarchyLevel === 'master' ? (
+                            <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                          ) : productCustomerHierarchyLevel === 'group' ? (
+                            <GitFork className="w-3.5 h-3.5 text-indigo-600" />
+                          ) : (
+                            <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          )}
+                          <span>{c.name}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-black text-slate-900 dark:text-white">
+                          ₹{c.sales.toFixed(2)} Cr
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-purple-600 dark:text-purple-400">
+                          {c.contributionPct}%
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          {c.quantity.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-medium">{c.invoiceCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Plant Breakdown for Selected Product */}
+            {productPlantDistribution.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-6 shadow-card space-y-3">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <Boxes className="w-4 h-4 text-amber-500" />
+                  <span>Plant Location Distribution for "{productMetrics.description}"</span>
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {productPlantDistribution.map(plant => (
+                    <div key={plant.plantCode} className="p-3 bg-amber-50/50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50 space-y-1">
+                      <span className="text-xs font-bold text-amber-800 dark:text-amber-300">{plant.plantName} ({plant.plantCode})</span>
+                      <p className="text-sm font-black text-slate-900 dark:text-white">₹{plant.sales.toFixed(2)} Cr</p>
+                      <p className="text-[10px] text-slate-500">{plant.quantity.toLocaleString()} Inv Qty</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Product Performance across Financial Years */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card space-y-4">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <TrendingUp className="w-4 h-4 text-brand-500" />
@@ -399,7 +560,7 @@ export const ProductAnalysis: React.FC = () => {
                   <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="py-2.5 px-3">Financial Year</th>
-                      <th className="py-2.5 px-3 text-right">FY Sales</th>
+                      <th className="py-2.5 px-3 text-right">FY Sales (Cr)</th>
                       <th className="py-2.5 px-3 text-right">YoY Growth</th>
                       <th className="py-2.5 px-3 text-right">FY Invoice Qty</th>
                       <th className="py-2.5 px-3 text-right">Customer Count</th>
@@ -411,7 +572,7 @@ export const ProductAnalysis: React.FC = () => {
                       <tr key={fyRow.financialYear} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium">
                         <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{fyRow.financialYear}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
-                          ₹{(fyRow.sales / 100000).toFixed(2)} Lakhs
+                          ₹{fyRow.sales.toFixed(2)} Cr
                         </td>
                         <td className="py-2.5 px-3 text-right font-bold">
                           {fyRow.yoyGrowthPct !== null && fyRow.yoyGrowthPct !== undefined ? (
@@ -434,7 +595,7 @@ export const ProductAnalysis: React.FC = () => {
               </div>
             </div>
 
-            {/* Product Monthly Sales Velocity (April -> March Order) */}
+            {/* Product Monthly Sales Velocity */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
               <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">Monthly Velocity Trend (Chronological April → March)</h3>
               <div className="h-60 w-full">
@@ -442,8 +603,8 @@ export const ProductAnalysis: React.FC = () => {
                   <AreaChart data={productMonthlyTrend}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toFixed(2)} Cr`, 'Sales Value']} />
                     <Area type="monotone" dataKey="sales" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -458,36 +619,11 @@ export const ProductAnalysis: React.FC = () => {
                   <BarChart data={productQuarterlyTrend}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                     <XAxis dataKey="quarter" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toFixed(2)} Cr`, 'Sales Value']} />
                     <Bar dataKey="sales" fill="#0c8de9" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Top Customers for this Product */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-3">Top Key Accounts Buying SKU</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {productTopCustomers.map(tc => (
-                  <div
-                    key={tc.customer}
-                    onClick={() => {
-                      toggleCustomerFilter(tc.customer);
-                      setActiveView('customers');
-                    }}
-                    className="flex justify-between items-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-brand-50/50 cursor-pointer"
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white">{tc.customer}</p>
-                      <p className="text-[10px] text-slate-400">{tc.quantity.toLocaleString()} units purchased</p>
-                    </div>
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      ₹{(tc.sales / 100000).toFixed(1)}L
-                    </span>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
@@ -496,3 +632,4 @@ export const ProductAnalysis: React.FC = () => {
     </div>
   );
 };
+

@@ -5,58 +5,55 @@ interface SampleRecord {
 }
 
 const CUSTOMERS = [
-  { num: 'CUST-1001', name: 'Arun Traders' },
-  { num: 'CUST-1002', name: 'Metro Retail Hub' },
-  { num: 'CUST-1003', name: 'Sunshine Supermarket' },
-  { num: 'CUST-1004', name: 'Galaxy Wholesalers' },
-  { num: 'CUST-1005', name: 'Apex General Store' },
-  { num: 'CUST-1006', name: 'Royal Food Bazaar' },
-  { num: 'CUST-1007', name: 'Prime Corner Shop' },
-  { num: 'CUST-1008', name: 'Vanguard Retail Ltd' },
-  { num: 'CUST-1009', name: 'Greenleaf Mart' },
-  { num: 'CUST-1010', name: 'Bluebell Hypermarket' },
-  { num: 'CUST-1011', name: 'Standard Groceries' },
-  { num: 'CUST-1012', name: 'Heritage Enterprise' },
-  { num: 'CUST-1013', name: 'City Center Store' },
-  { num: 'CUST-1014', name: 'Evergreen Emporium' },
-  { num: 'CUST-1015', name: 'Golden Harvest Outlets' },
+  { num: 'CUST-1001', name: 'Arun Traders', group: 'Arun Retail Group', masterGroup: 'Arun Enterprises' },
+  { num: 'CUST-1002', name: 'Metro Retail Hub', group: 'Metro Retail Group', masterGroup: 'Metro Holdings' },
+  { num: 'CUST-1003', name: 'Sunshine Supermarket', group: 'Sunshine Retail Group', masterGroup: 'Sunshine Retail Corp' },
+  { num: 'CUST-1004', name: 'Galaxy Wholesalers', group: 'Galaxy Distribution', masterGroup: 'Galaxy Conglomerate' },
+  { num: 'CUST-1005', name: 'Apex General Store', group: 'Apex Retail Chain', masterGroup: 'Apex Commercial Group' },
+  { num: 'CUST-1006', name: 'Royal Food Bazaar', group: 'Royal Bazaar Group', masterGroup: 'Royal Retail Group' },
+  { num: 'CUST-1007', name: 'Prime Corner Shop', group: 'Prime Outlets', masterGroup: 'Prime Enterprises' },
+  { num: 'CUST-1008', name: 'Vanguard Retail Ltd', group: 'Vanguard Chain', masterGroup: 'Vanguard Global' },
+  { num: 'CUST-1009', name: 'Greenleaf Mart', group: 'Greenleaf Retail', masterGroup: 'Greenleaf Organics' },
+  { num: 'CUST-1010', name: 'Bluebell Hypermarket', group: 'Bluebell Stores', masterGroup: 'Bluebell Holdings' },
+  { num: 'CUST-1011', name: 'Standard Groceries', group: 'Standard Retail', masterGroup: 'Standard Enterprise' },
+  { num: 'CUST-1012', name: 'Heritage Enterprise', group: 'Heritage Outlets', masterGroup: 'Heritage Group' },
+  { num: 'CUST-1013', name: 'City Center Store', group: 'City Center Hubs', masterGroup: 'City Retail Corp' },
+  { num: 'CUST-1014', name: 'Evergreen Emporium', group: 'Evergreen Stores', masterGroup: 'Evergreen Global' },
+  { num: 'CUST-1015', name: 'Golden Harvest Outlets', group: 'Golden Harvest Group', masterGroup: 'Golden Harvest Inc' },
 ];
 
+const PLANT_CODES = ['3000', '3100', '3200', '3600'];
+
 const PRODUCTS_BY_SEGMENT: Record<string, { code: string; name: string; basePrice: number }[]> = {
-  'Staples': [
-    { code: 'MAT-101', name: 'Premium Basmati Rice 5kg', basePrice: 450 },
-    { code: 'MAT-102', name: 'Organic Whole Wheat Atta 10kg', basePrice: 380 },
-    { code: 'MAT-103', name: 'Refined Sugar 5kg', basePrice: 220 },
-    { code: 'MAT-104', name: 'Toor Dal Premium 1kg', basePrice: 160 },
+  'Commercial Vehicles': [
+    { code: 'MAT-101', name: 'Heavy Axle Assembly 5000', basePrice: 2.85 },
+    { code: 'MAT-102', name: 'Hydraulic Brake System Pro', basePrice: 1.95 },
+    { code: 'MAT-103', name: 'Commercial Steering Gear Unit', basePrice: 3.40 },
+    { code: 'MAT-104', name: 'Diesel Engine Turbo Kit', basePrice: 4.10 },
   ],
-  'Cooking Essentials': [
-    { code: 'MAT-201', name: 'Refined Sunflower Oil 1L', basePrice: 140 },
-    { code: 'MAT-202', name: 'Mustard Oil Cold Pressed 1L', basePrice: 180 },
-    { code: 'MAT-203', name: 'Iodized Salt 1kg', basePrice: 25 },
-    { code: 'MAT-204', name: 'Pure Cow Ghee 500ml', basePrice: 350 },
+  'Passenger Vehicles': [
+    { code: 'MAT-201', name: 'Electronic Power Steering Unit', basePrice: 1.45 },
+    { code: 'MAT-202', name: 'ABS Brake Controller Module', basePrice: 1.10 },
+    { code: 'MAT-203', name: 'MacPherson Strut Suspension', basePrice: 0.85 },
+    { code: 'MAT-204', name: 'Transmission Control Unit', basePrice: 2.20 },
   ],
-  'Beverages': [
-    { code: 'MAT-301', name: 'Instant Gold Coffee 100g', basePrice: 280 },
-    { code: 'MAT-302', name: 'Premium Assam Tea 500g', basePrice: 240 },
-    { code: 'MAT-303', name: 'Organic Green Tea 25 Bags', basePrice: 195 },
-    { code: 'MAT-304', name: 'Mango Nectar Juice 1L', basePrice: 95 },
+  '2 Wheelers & 3 Wheelers': [
+    { code: 'MAT-301', name: 'Monoshock Rear Absorber', basePrice: 0.35 },
+    { code: 'MAT-302', name: 'Digital Fuel Injection Unit', basePrice: 0.45 },
+    { code: 'MAT-303', name: 'Disc Brake Master Cylinder', basePrice: 0.28 },
+    { code: 'MAT-304', name: 'Electric Motor Hub Assembly', basePrice: 0.65 },
   ],
-  'Personal Care': [
-    { code: 'MAT-401', name: 'Herbal Moisture Shampoo 350ml', basePrice: 210 },
-    { code: 'MAT-402', name: 'Gentle Skin Cleansing Soap 125g', basePrice: 45 },
-    { code: 'MAT-403', name: 'Anti-Dandruff Conditioner 200ml', basePrice: 190 },
-    { code: 'MAT-404', name: 'Natural Whitening Toothpaste 150g', basePrice: 85 },
+  'Tractors & Off-Highway': [
+    { code: 'MAT-401', name: 'Heavy Duty Hydraulic Pump', basePrice: 2.50 },
+    { code: 'MAT-402', name: 'Tractor Power Take-Off Unit', basePrice: 1.80 },
+    { code: 'MAT-403', name: 'Differential Lock Gearbox', basePrice: 3.10 },
+    { code: 'MAT-404', name: 'All-Terrain Clutch Assembly', basePrice: 1.40 },
   ],
-  'Household Care': [
-    { code: 'MAT-501', name: 'Ultra Detergent Powder 1kg', basePrice: 130 },
-    { code: 'MAT-502', name: 'Dishwash Gel Lemon 500ml', basePrice: 110 },
-    { code: 'MAT-503', name: 'Disinfectant Floor Cleaner 1L', basePrice: 160 },
+  'Industrial & Spares': [
+    { code: 'MAT-501', name: 'Precision Ball Bearing Kit', basePrice: 0.40 },
+    { code: 'MAT-502', name: 'Synthetic Gear Lubricant 50L', basePrice: 0.55 },
+    { code: 'MAT-503', name: 'Heavy Gasket Seal Ring Set', basePrice: 0.22 },
   ],
-  'Snacks & Confectionery': [
-    { code: 'MAT-601', name: 'Dark Chocolate Almond 100g', basePrice: 150 },
-    { code: 'MAT-602', name: 'Crispy Potato Wafers 150g', basePrice: 40 },
-    { code: 'MAT-603', name: 'Butter Cookies Family Pack', basePrice: 120 },
-  ]
 };
 
 export function generateSampleData(recordCount = 2500): SampleRecord[] {
@@ -72,6 +69,8 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     const segment = segments[Math.floor(Math.random() * segments.length)];
     const products = PRODUCTS_BY_SEGMENT[segment];
     const product = products[Math.floor(Math.random() * products.length)];
+    const plantCode = PLANT_CODES[Math.floor(Math.random() * PLANT_CODES.length)];
+    const invoiceNum = `INV-${500100 + i}`;
 
     // Random date within 4 financial years
     const dayOffset = Math.floor(Math.random() * totalDays);
@@ -82,26 +81,32 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     const billDate = `${yyyy}-${mm}-${dd}`;
 
     const invQty = Math.floor(Math.random() * 45) + 5; // 5 to 50 cases
-    const qtyInNos = invQty; // In company Excel, Inv. Qty and Sale Qty in nos represent identical quantities
+    const qtyInNos = invQty;
 
-    // Apply progressive annual growth factor across 4 FYs
+    // Value In Crs calculation directly in Crores
     const yearFactor = yyyy === 2022 ? 0.75 : yyyy === 2023 ? 0.88 : yyyy === 2024 ? 1.02 : yyyy === 2025 ? 1.18 : 1.30;
     let priceMultiplier = 1.0;
     if (cust.name === 'Metro Retail Hub' || cust.name === 'Arun Traders') {
       priceMultiplier = 1.25;
     }
-    const saleValue = Math.round(product.basePrice * qtyInNos * yearFactor * priceMultiplier * (0.9 + Math.random() * 0.2));
+
+    const valueInCrs = Number((product.basePrice * (invQty / 20) * yearFactor * priceMultiplier * (0.85 + Math.random() * 0.3)).toFixed(2));
 
     records.push({
       'Cust Num.': cust.num,
       'Customer': cust.name,
+      'Customer Group': cust.group,
+      'Master Customer Group': cust.masterGroup,
       'Material code': product.code,
       'Description': product.name,
       'Bill Date': billDate,
       'Inv. Qty': invQty,
-      'Sale value(Doc rate)': saleValue, // Company header variation without space
-      'Sale Qty in nos': qtyInNos,
-      'ProductSegment': segment, // Company header variation without space
+      'Sale qty in nos': qtyInNos,
+      'Value In Crs': valueInCrs,
+      'Sale value (Doc rate)': valueInCrs,
+      'ProductSegment': segment,
+      'Plant': plantCode,
+      'Invoice Num.': invoiceNum,
     });
   }
 
@@ -116,26 +121,36 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
   records.push({
     'Cust Num.': 'CUST-1099',
     'Customer': 'Apex Store Branch',
+    'Customer Group': 'Apex Retail Chain',
+    'Master Customer Group': 'Apex Commercial Group',
     'Material code': 'MAT-101',
-    'Description': 'Premium Basmati Rice 5kg',
+    'Description': 'Heavy Axle Assembly 5000',
     'Bill Date': '2025-11-15',
     'Inv. Qty': 10,
-    'Sale value(Doc rate)': 22500,
-    'Sale Qty in nos': 10,
+    'Value In Crs': 1.45,
+    'Sale value (Doc rate)': 1.45,
+    'Sale qty in nos': 10,
     'ProductSegment': '', // missing segment
+    'Plant': '3000',
+    'Invoice Num.': 'INV-500999',
   });
 
   // 3. A deliberate quantity mismatch record for validation audit test
   records.push({
     'Cust Num.': 'CUST-1088',
     'Customer': 'Vanguard Retail Ltd',
+    'Customer Group': 'Vanguard Chain',
+    'Master Customer Group': 'Vanguard Global',
     'Material code': 'MAT-201',
-    'Description': 'Refined Sunflower Oil 1L',
+    'Description': 'Electronic Power Steering Unit',
     'Bill Date': '2025-12-01',
     'Inv. Qty': 20,
-    'Sale value(Doc rate)': 28000,
-    'Sale Qty in nos': 25, // Genuine quantity mismatch for audit check
-    'ProductSegment': 'Cooking Essentials',
+    'Value In Crs': 2.10,
+    'Sale value (Doc rate)': 2.10,
+    'Sale qty in nos': 25, // Genuine quantity mismatch for audit check
+    'ProductSegment': 'Passenger Vehicles',
+    'Plant': '3100',
+    'Invoice Num.': 'INV-500888',
   });
 
   return records;
@@ -149,3 +164,4 @@ export function writeSampleExcelFile(outputPath: string) {
   XLSX.writeFile(workbook, outputPath);
   console.log(`Generated sample Excel file with ${data.length} records at: ${outputPath}`);
 }
+

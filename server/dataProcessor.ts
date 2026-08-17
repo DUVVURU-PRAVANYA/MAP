@@ -142,17 +142,43 @@ export function parseExcelDateOnly(rawVal: any): { isoDate: string; year: number
   return { isoDate, year: yyyy, month: mmNum, day: ddNum, fyDetails };
 }
 
+export function normalizePlant(rawPlant: any): { plantCode: string; plantName: string } {
+  const str = String(rawPlant || '').trim();
+  if (!str) {
+    return { plantCode: '3000', plantName: 'Chennai' };
+  }
+  const cleanStr = str.toLowerCase();
+  if (str.includes('3000') || cleanStr.includes('chennai')) {
+    return { plantCode: '3000', plantName: 'Chennai' };
+  }
+  if (str.includes('3100') || cleanStr.includes('hyderabad')) {
+    return { plantCode: '3100', plantName: 'Hyderabad' };
+  }
+  if (str.includes('3200') || cleanStr.includes('pondicherry') || cleanStr.includes('puducherry')) {
+    return { plantCode: '3200', plantName: 'Pondicherry' };
+  }
+  if (str.includes('3600') || cleanStr.includes('trichy') || cleanStr.includes('tiruchirappalli')) {
+    return { plantCode: '3600', plantName: 'Trichy' };
+  }
+  return { plantCode: str, plantName: str };
+}
+
 const HEADER_ALIASES: Record<string, string[]> = {
   custNum: ['custnum', 'custno', 'customernumber', 'customercode'],
   customer: ['customer', 'customername', 'custname'],
+  customerGroup: ['customergroup', 'custgroup', 'group'],
+  masterCustomerGroup: ['mastercustomergroup', 'mastercustgroup', 'mastergroup', 'parentgroup'],
   materialCode: ['materialcode', 'itemcode', 'productcode', 'matcode'],
   description: ['description', 'materialdescription', 'productdescription', 'itemname'],
   product: ['product', 'productname', 'item'],
   billDate: ['billdate', 'invoicedate', 'date'],
   invQty: ['invqty', 'invoiceqty', 'invoicequantity'],
-  saleValue: ['salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
+  valueInCrs: ['valueincrs', 'valueincr', 'valueincrs', 'valueincr', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
+  saleValue: ['valueincrs', 'valueincr', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
   saleQty: ['saleqtyinnos', 'saleqty', 'salesqty', 'quantity'],
   productSegment: ['segment', 'vehiclesegment', 'productsegment', 'category'],
+  plant: ['plant', 'plantcode', 'plantnum', 'factory'],
+  invoiceNum: ['invoicenum', 'invoicenumber', 'invoiceno', 'billnum', 'billnumber', 'invoicedoc'],
 };
 
 export function normalizeHeader(str: string): string {
@@ -257,6 +283,12 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
 
     const custNum = String(getValByConcept('custNum')).trim();
     const customer = String(getValByConcept('customer')).trim();
+    const customerGroupStr = String(getValByConcept('customerGroup')).trim();
+    const masterCustomerGroupStr = String(getValByConcept('masterCustomerGroup')).trim();
+
+    const customerGroup = customerGroupStr || customer || 'General Group';
+    const masterCustomerGroup = masterCustomerGroupStr || customerGroup || customer || 'General Corp';
+
     const materialCode = String(getValByConcept('materialCode')).trim();
     let description = String(getValByConcept('description')).trim();
     let productCol = String(getValByConcept('product')).trim();
@@ -265,17 +297,24 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     }
     const rawBillDate = getValByConcept('billDate');
     const rawInvQty = getValByConcept('invQty');
+    const rawValueInCrs = getValByConcept('valueInCrs');
     const rawSaleVal = getValByConcept('saleValue');
     const rawSaleQty = getValByConcept('saleQty');
     let productSegment = String(getValByConcept('productSegment')).trim();
 
-    // Check duplicate signature
-    const signature = `${custNum}|${materialCode}|${rawBillDate}|${rawSaleVal}|${rawSaleQty}`;
+    const rawPlant = getValByConcept('plant');
+    const rawInvoiceNum = getValByConcept('invoiceNum');
+
+    const { plantCode, plantName } = normalizePlant(rawPlant);
+    const invoiceNum = String(rawInvoiceNum || `INV-${500100 + index}`).trim();
+
+    // Duplicate Detection: Invoice Num. ONLY
+    const signature = invoiceNum;
     if (seenSignatures.has(signature)) {
       duplicatesCount++;
       flaggedRows.push({
         rowNumber: rowNum,
-        issue: 'Duplicate Record Removed',
+        issue: 'Duplicate Record Removed (Duplicate Invoice Num.)',
         rawData: row,
       });
       return;
@@ -284,7 +323,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
 
     // Parse numeric fields with robust formatting tolerance
     const invQty = parseNumeric(rawInvQty);
-    const saleValue = parseNumeric(rawSaleVal);
+    const saleValue = parseNumeric(rawValueInCrs || rawSaleVal);
     const saleQty = parseNumeric(rawSaleQty);
 
     // Discard only if row has zero/unparseable values across all numeric fields and lacks account details
@@ -322,6 +361,8 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       id: `REC-${cleanRecords.length + 1}`,
       custNum: custNum || 'CUST-GENERIC',
       customer: customer || 'General Customer',
+      customerGroup,
+      masterCustomerGroup,
       materialCode: materialCode || 'MAT-GENERIC',
       description,
       product: productCol || description,
@@ -332,9 +373,13 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       year: fyDetails.year,
       financialYear: fyDetails.financialYear,
       invQty,
-      saleValue,
+      saleValue, // Value in Crores
+      valueInCrs: saleValue, // Value in Crores
       saleQty: rawSaleQtyStr !== '' ? saleQty : invQty,
       productSegment,
+      plantCode,
+      plantName,
+      invoiceNum,
     });
   });
 
