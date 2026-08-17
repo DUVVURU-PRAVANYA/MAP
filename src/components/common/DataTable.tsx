@@ -121,9 +121,21 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
-              <th onClick={() => handleSort('billDate')} className="py-3 px-4 cursor-pointer">
+              <th onClick={() => handleSort('grnDate')} className="py-3 px-4 cursor-pointer">
                 <div className="flex items-center space-x-1">
-                  <span>Bill Date</span>
+                  <span>GRN Date</span>
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                </div>
+              </th>
+              <th onClick={() => handleSort('invoiceNum')} className="py-3 px-4 cursor-pointer">
+                <div className="flex items-center space-x-1">
+                  <span>Invoice Num.</span>
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                </div>
+              </th>
+              <th onClick={() => handleSort('plantName')} className="py-3 px-4 cursor-pointer">
+                <div className="flex items-center space-x-1">
+                  <span>Plant</span>
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
@@ -153,7 +165,7 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
               </th>
               <th onClick={() => handleSort('saleValue')} className="py-3 px-4 text-right cursor-pointer">
                 <div className="flex items-center justify-end space-x-1">
-                  <span>Sale Value (₹)</span>
+                  <span>Sales (Cr)</span>
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
@@ -167,7 +179,9 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
                     {r.financialYear}
                   </span>
                 </td>
-                <td className="py-3 px-4 font-mono font-medium text-slate-500">{r.billDate}</td>
+                <td className="py-3 px-4 font-mono font-medium text-slate-500">{r.grnDate || r.billDate}</td>
+                <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300 font-semibold">{r.invoiceNum}</td>
+                <td className="py-3 px-4 font-bold text-amber-600 dark:text-amber-400">{r.plantName}</td>
                 <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">{r.customer}</td>
                 <td className="py-3 px-4">
                   <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-semibold">
@@ -177,7 +191,7 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
                 <td className="py-3 px-4 font-medium text-slate-800 dark:text-slate-200">{r.description}</td>
                 <td className="py-3 px-4 text-right font-semibold">{r.invQty}</td>
                 <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-white">
-                  ₹{r.saleValue.toLocaleString('en-IN')}
+                  ₹{r.saleValue.toFixed(2)} Cr
                 </td>
                 </tr>
             ))}

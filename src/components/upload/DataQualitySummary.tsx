@@ -211,17 +211,21 @@ export const DataQualitySummary: React.FC = () => {
                   <span>Original Uploaded Records</span>
                   <span className="font-mono font-bold text-white">{qualitySummary.originalRecords.toLocaleString()}</span>
                 </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-700/60 text-rose-400">
+                  <span>Bill Type = L2 Records Excluded</span>
+                  <span className="font-mono font-bold">-{qualitySummary.l2RecordsRemoved.toLocaleString()}</span>
+                </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-700/60 text-amber-400">
-                  <span>Duplicate Records Removed</span>
-                  <span className="font-mono font-bold">-{qualitySummary.duplicatesRemoved}</span>
+                  <span>Duplicate Records Removed (Invoice Num)</span>
+                  <span className="font-mono font-bold">-{qualitySummary.duplicatesRemoved.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-700/60 text-amber-400">
                   <span>Invalid / Non-Numeric Rows Removed</span>
-                  <span className="font-mono font-bold">-{qualitySummary.invalidRecordsRemoved}</span>
+                  <span className="font-mono font-bold">-{qualitySummary.invalidRecordsRemoved.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-700/60 text-indigo-400">
                   <span>Missing Attributes Auto-Filled</span>
-                  <span className="font-mono font-bold">+{qualitySummary.missingValuesFixed}</span>
+                  <span className="font-mono font-bold">+{qualitySummary.missingValuesFixed.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-3 text-lg font-bold text-emerald-400">
                   <span>Final Processed Clean Dataset</span>

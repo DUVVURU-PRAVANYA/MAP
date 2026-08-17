@@ -31,11 +31,14 @@ export interface CleanSalesRecord {
   description: string;
   product?: string;
   billDate: string; // ISO format YYYY-MM-DD
-  month: string; // e.g. "Apr 2025" or "April"
-  monthSortKey?: number; // Chronological sorting key (year * 12 + monthIndex)
-  quarter: string; // e.g. "Q1" or "Q1 FY25"
-  year: number; // e.g. 2025
-  financialYear: string; // e.g. "FY 2024-25"
+  grnDate: string; // Primary Reporting Date (ISO format YYYY-MM-DD)
+  grnNo?: string;
+  billType: string; // e.g. "L1", "S1", etc. ("L2" excluded)
+  month: string; // Derived from GRN date, e.g. "Apr 2025" or "April"
+  monthSortKey?: number; // Chronological sorting key (year * 12 + monthIndex) from GRN date
+  quarter: string; // Derived from GRN date, e.g. "Q1" or "Q1 FY25"
+  year: number; // Derived from GRN date, e.g. 2025
+  financialYear: string; // Derived from GRN date, e.g. "FY 2024-25"
   invQty: number;
   saleValue: number; // Value in Crores directly
   valueInCrs: number; // Value in Crores
@@ -44,6 +47,13 @@ export interface CleanSalesRecord {
   plantCode: string; // e.g. '3000'
   plantName: string; // e.g. 'Chennai'
   invoiceNum: string; // e.g. 'INV-500101'
+  customerPurNum?: string;
+  refDocNo?: string;
+  oemCustomer?: string;
+  rblProductSegment?: string;
+  organicNpd?: string;
+  aopOem?: string;
+  application?: string;
   isFlagged?: boolean;
   flagReason?: string;
 }
@@ -100,6 +110,7 @@ export interface DataValidationRule {
 
 export interface DataQualitySummary {
   originalRecords: number;
+  l2RecordsRemoved: number;
   duplicatesRemoved: number;
   invalidRecordsRemoved: number;
   missingValuesFixed: number;

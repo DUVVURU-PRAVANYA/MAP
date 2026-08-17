@@ -113,26 +113,32 @@ export const DataQualityPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-xs">
           <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-            <p className="text-slate-400">Original Row Count</p>
+            <p className="text-slate-400 font-medium">Original Row Count</p>
             <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
               {qualitySummary.originalRecords.toLocaleString()}
             </p>
           </div>
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-800/60">
+            <p className="text-rose-700 dark:text-rose-300 font-medium">L2 Records Excluded</p>
+            <p className="text-base font-bold text-rose-600 dark:text-rose-400 mt-0.5">
+              {qualitySummary.l2RecordsRemoved.toLocaleString()}
+            </p>
+          </div>
           <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-            <p className="text-slate-400">Clean Active Rows</p>
+            <p className="text-slate-400 font-medium">Clean Active Rows</p>
             <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
               {qualitySummary.cleanRecords.toLocaleString()}
             </p>
           </div>
           <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-            <p className="text-slate-400">Duplicates Cleaned</p>
-            <p className="text-base font-bold text-amber-500 mt-0.5">{qualitySummary.duplicatesRemoved}</p>
+            <p className="text-slate-400 font-medium">Duplicates Cleaned</p>
+            <p className="text-base font-bold text-amber-500 mt-0.5">{qualitySummary.duplicatesRemoved.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-            <p className="text-slate-400">Missing Fields Fixed</p>
-            <p className="text-base font-bold text-indigo-500 mt-0.5">{qualitySummary.missingValuesFixed}</p>
+            <p className="text-slate-400 font-medium">Missing Fields Fixed</p>
+            <p className="text-base font-bold text-indigo-500 mt-0.5">{qualitySummary.missingValuesFixed.toLocaleString()}</p>
           </div>
         </div>
       </div>

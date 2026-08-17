@@ -169,13 +169,23 @@ const HEADER_ALIASES: Record<string, string[]> = {
   customerGroup: ['customergroup', 'custgroup', 'group'],
   masterCustomerGroup: ['mastercustomergroup', 'mastercustgroup', 'mastergroup', 'parentgroup'],
   materialCode: ['materialcode', 'itemcode', 'productcode', 'matcode'],
-  description: ['description', 'materialdescription', 'productdescription', 'itemname'],
+  description: ['description', 'materialdescription', 'productdescription', 'itemname', 'desciption'],
   product: ['product', 'productname', 'item'],
   billDate: ['billdate', 'invoicedate', 'date'],
-  invQty: ['invqty', 'invoiceqty', 'invoicequantity'],
-  valueInCrs: ['valueincrs', 'valueincr', 'valueincrs', 'valueincr', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
-  saleValue: ['valueincrs', 'valueincr', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
-  saleQty: ['saleqtyinnos', 'saleqty', 'salesqty', 'quantity'],
+  grnDate: ['grndate', 'grndt', 'grn_date', 'grn date', 'grn'],
+  grnNo: ['grnno', 'grn_no', 'grnnumber', 'grnnum', 'grn no'],
+  billType: ['billtype', 'bill_type', 'type'],
+  customerPurNum: ['customerpurnum', 'customerpurno', 'purnum', 'purno'],
+  refDocNo: ['refdocno', 'refdocnumber', 'refno'],
+  oemCustomer: ['oemcustomer', 'oem'],
+  rblProductSegment: ['rblproductsegment', 'rblsegment'],
+  organicNpd: ['organicnpd', 'organic', 'npd'],
+  aopOem: ['aopoem', 'aop'],
+  application: ['application', 'usecase'],
+  invQty: ['sumofinvqty', 'invqty', 'invoiceqty', 'invoicequantity'],
+  valueInCrs: ['sumofvalueincrs', 'valueincrs', 'valueincr', 'sumofsalevaluedocrate', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
+  saleValue: ['sumofvalueincrs', 'valueincrs', 'valueincr', 'sumofsalevaluedocrate', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales'],
+  saleQty: ['sumofsaleqtyinnos', 'saleqtyinnos', 'saleqty', 'salesqty', 'quantity'],
   productSegment: ['segment', 'vehiclesegment', 'productsegment', 'category'],
   plant: ['plant', 'plantcode', 'plantnum', 'factory'],
   invoiceNum: ['invoicenum', 'invoicenumber', 'invoiceno', 'billnum', 'billnumber', 'invoicedoc'],
@@ -201,6 +211,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   const cleanRecords: CleanSalesRecord[] = [];
   const flaggedRows: { rowNumber: number; issue: string; rawData: Record<string, any> }[] = [];
 
+  let l2RecordsCount = 0;
   let duplicatesCount = 0;
   let invalidRecordsCount = 0;
   let missingValuesFixedCount = 0;
@@ -208,6 +219,13 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
 
   const seenSignatures = new Set<string>();
   const validationRulesMap: Record<string, DataValidationRule> = {
+    l2_exclusion: {
+      id: 'l2_exclusion',
+      title: 'Bill Type = L2 Exclusion',
+      description: 'Excludes Bill Type L2 records from all calculations and analysis',
+      status: 'success',
+      count: 0,
+    },
     required_cols: {
       id: 'required_cols',
       title: 'Required Columns',
@@ -216,8 +234,8 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     },
     date_format: {
       id: 'date_format',
-      title: 'Date Format Verification',
-      description: 'Validates Bill Date format and April-March Financial Year derivation',
+      title: 'Date Format Verification (GRN Date)',
+      description: 'Validates GRN Date format and April-March Financial Year derivation',
       status: 'success',
     },
     numeric_fields: {
@@ -240,8 +258,8 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     },
     duplicate_records: {
       id: 'duplicate_records',
-      title: 'Duplicate Records Check',
-      description: 'Finds exact duplicate sales records',
+      title: 'Duplicate Records Check (Invoice Num ONLY)',
+      description: 'Finds duplicate transactions by Invoice Num.',
       status: 'success',
     },
     data_range: {
@@ -257,6 +275,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   const actualNormalizedCols = Object.keys(sampleRow).map(normalizeHeader);
 
   const missingConcepts = Object.entries(HEADER_ALIASES).filter(([concept, aliases]) => {
+    if (['customerPurNum', 'refDocNo', 'oemCustomer', 'rblProductSegment', 'organicNpd', 'aopOem', 'application'].includes(concept)) return false;
     return !aliases.some(alias => actualNormalizedCols.includes(alias));
   });
 
@@ -281,6 +300,19 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       return '';
     };
 
+    // Rule 1: Exclude Bill Type = L2 records before any dashboard calculations
+    const rawBillType = String(getValByConcept('billType')).trim();
+    const billType = rawBillType || 'L1';
+    if (billType.toUpperCase() === 'L2') {
+      l2RecordsCount++;
+      flaggedRows.push({
+        rowNumber: rowNum,
+        issue: 'Bill Type = L2 Record Excluded',
+        rawData: row,
+      });
+      return;
+    }
+
     const custNum = String(getValByConcept('custNum')).trim();
     const customer = String(getValByConcept('customer')).trim();
     const customerGroupStr = String(getValByConcept('customerGroup')).trim();
@@ -295,7 +327,11 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     if (!description && productCol) {
       description = productCol;
     }
+
+    const rawGrnDate = getValByConcept('grnDate');
     const rawBillDate = getValByConcept('billDate');
+    const grnNo = String(getValByConcept('grnNo')).trim();
+
     const rawInvQty = getValByConcept('invQty');
     const rawValueInCrs = getValByConcept('valueInCrs');
     const rawSaleVal = getValByConcept('saleValue');
@@ -308,7 +344,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     const { plantCode, plantName } = normalizePlant(rawPlant);
     const invoiceNum = String(rawInvoiceNum || `INV-${500100 + index}`).trim();
 
-    // Duplicate Detection: Invoice Num. ONLY
+    // Rule 5: Duplicate Detection on Invoice Num. ONLY
     const signature = invoiceNum;
     if (seenSignatures.has(signature)) {
       duplicatesCount++;
@@ -344,8 +380,10 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       quantityMismatchCount++;
     }
 
-    // Parse date-only value to prevent timezone shifts
-    const { isoDate, fyDetails } = parseExcelDateOnly(rawBillDate);
+    // Rule 2 & 3: GRN Date is the primary reporting date for FY, Quarter, Month, and Chronological Ordering
+    const primaryDateVal = rawGrnDate || rawBillDate;
+    const { isoDate: grnIsoDate, fyDetails } = parseExcelDateOnly(primaryDateVal);
+    const { isoDate: billIsoDate } = parseExcelDateOnly(rawBillDate);
 
     // Missing handling defaults
     if (!productSegment) {
@@ -366,7 +404,10 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       materialCode: materialCode || 'MAT-GENERIC',
       description,
       product: productCol || description,
-      billDate: isoDate,
+      billDate: billIsoDate || grnIsoDate,
+      grnDate: grnIsoDate,
+      grnNo,
+      billType,
       month: fyDetails.month,
       monthSortKey: fyDetails.monthSortKey,
       quarter: fyDetails.quarter,
@@ -380,6 +421,13 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
       plantCode,
       plantName,
       invoiceNum,
+      customerPurNum: String(getValByConcept('customerPurNum')).trim(),
+      refDocNo: String(getValByConcept('refDocNo')).trim(),
+      oemCustomer: String(getValByConcept('oemCustomer')).trim(),
+      rblProductSegment: String(getValByConcept('rblProductSegment')).trim(),
+      organicNpd: String(getValByConcept('organicNpd')).trim(),
+      aopOem: String(getValByConcept('aopOem')).trim(),
+      application: String(getValByConcept('application')).trim(),
     });
   });
 
@@ -388,15 +436,21 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   const productSet = new Set(cleanRecords.map(r => `${r.materialCode}|||${r.description}`));
   const segmentSet = new Set(cleanRecords.map(r => r.productSegment));
 
-  const sortedDates = [...cleanRecords].map(r => r.billDate).sort();
+  const sortedDates = [...cleanRecords].map(r => r.grnDate).sort();
   const dateRangeStart = sortedDates[0] || 'N/A';
   const dateRangeEnd = sortedDates[sortedDates.length - 1] || 'N/A';
 
   // Rule status updates
+  if (l2RecordsCount > 0) {
+    validationRulesMap.l2_exclusion.status = 'warning';
+    validationRulesMap.l2_exclusion.count = l2RecordsCount;
+    validationRulesMap.l2_exclusion.description = `Excluded ${l2RecordsCount} Bill Type = L2 record(s) from analysis`;
+  }
+
   if (duplicatesCount > 0) {
     validationRulesMap.duplicate_records.status = 'warning';
     validationRulesMap.duplicate_records.count = duplicatesCount;
-    validationRulesMap.duplicate_records.description = `Detected and cleaned ${duplicatesCount} duplicate record(s)`;
+    validationRulesMap.duplicate_records.description = `Detected and cleaned ${duplicatesCount} duplicate record(s) by Invoice Num.`;
   }
 
   validationRulesMap.quantity_mismatch.status = 'success';
@@ -415,6 +469,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
 
   const qualitySummary: DataQualitySummary = {
     originalRecords,
+    l2RecordsRemoved: l2RecordsCount,
     duplicatesRemoved: duplicatesCount,
     invalidRecordsRemoved: invalidRecordsCount,
     missingValuesFixed: missingValuesFixedCount,
