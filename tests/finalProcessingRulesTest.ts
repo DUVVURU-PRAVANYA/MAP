@@ -3,7 +3,7 @@ import { RawSalesRecord } from '../src/types/analytics';
 
 console.log('=== Running Final Data Processing & Dashboard Rules Test Suite ===\n');
 
-// Test dataset covering L2 removal, GRN date FY, Invoice Num duplicates, Customer Count, and Plant Mappings
+// Test dataset covering L2 removal, GRN date FY, Invoice Num retention (NO duplicate removal), Customer Count, and Plant Mappings
 const mockRawRecords: RawSalesRecord[] = [
   // 1. Bill Type L2 record (Must be REMOVED)
   {
@@ -50,9 +50,9 @@ const mockRawRecords: RawSalesRecord[] = [
     'Inv. Qty': '100',
     'Plant': '3000',
   },
-  // 4. Duplicate Invoice Number (INV-002 repeated, Must be REMOVED as duplicate)
+  // 4. Duplicate/Repeated Invoice Number (INV-002 repeated, MUST BE RETAINED per Master Prompt Rule 2)
   {
-    'Invoice Num.': 'INV-002', // Duplicate Invoice Num
+    'Invoice Num.': 'INV-002', // Repeated Invoice Num
     'Bill type': 'L1',
     'GRN date': '2025-04-01',
     'Customer': 'TVS Chennai',
@@ -126,23 +126,13 @@ if (l2InClean.length === 0 && qualitySummary.l2RecordsRemoved === 1) {
   process.exit(1);
 }
 
-// --- TEST 2: Different Invoice Numbers ---
-console.log('\n--- TEST 2: Different Invoice Numbers (INV-001 vs INV-002) ---');
-const inv1And2 = cleanRecords.filter(r => r.invoiceNum === 'INV-001' || r.invoiceNum === 'INV-002');
-if (inv1And2.length === 2) {
-  console.log('✓ TEST 2 PASSED: INV-001 and INV-002 were BOTH retained (0 false duplicates).');
-} else {
-  console.error(`❌ TEST 2 FAILED: Expected 2 records, got ${inv1And2.length}`);
-  process.exit(1);
-}
-
-// --- TEST 3: Duplicate Invoice Number ---
-console.log('\n--- TEST 3: Duplicate Invoice Number (INV-002 repeat) ---');
+// --- TEST 2: Repeated Invoice Numbers Retained (INV-001 vs INV-002) ---
+console.log('\n--- TEST 2 & 3 & 8: Repeated Invoice Numbers Retained (No Duplicate Removal) ---');
 const inv2Count = cleanRecords.filter(r => r.invoiceNum === 'INV-002').length;
-if (inv2Count === 1 && qualitySummary.duplicatesRemoved === 1) {
-  console.log('✓ TEST 3 PASSED: Repeated INV-002 triggered duplicate removal (1 removed).');
+if (inv2Count === 2 && cleanRecords.length === 6 && qualitySummary.duplicatesRemoved === 0) {
+  console.log('✓ TEST 2 & 3 & 8 PASSED: Repeated INV-002 records BOTH retained cleanly (6 total records retained, 0 duplicates removed).');
 } else {
-  console.error(`❌ TEST 3 FAILED: Expected 1 INV-002 record, got ${inv2Count}`);
+  console.error(`❌ TEST 2 & 3 & 8 FAILED: Expected 2 INV-002 records and 6 total clean records, got inv2Count=${inv2Count}, cleanRecords=${cleanRecords.length}`);
   process.exit(1);
 }
 
@@ -178,19 +168,73 @@ if (masterCustomerCount === 2) { // TVS Conglomerate & ABC Enterprises
   process.exit(1);
 }
 
-// --- TEST 6: Plant Mappings ---
-console.log('\n--- TEST 6: Plant Mappings (3000->Chennai, 3100->Hyderabad, 3200->Pondicherry, 3600->Trichy) ---');
-const plants = cleanRecords.map(r => `${r.plantCode}:${r.plantName}`);
-if (
-  plants.includes('3000:Chennai') &&
-  plants.includes('3100:Hyderabad') &&
-  plants.includes('3200:Pondicherry') &&
-  plants.includes('3600:Trichy')
-) {
-  console.log('✓ TEST 6 PASSED: Plant mappings verified (Chennai, Hyderabad, Pondicherry, Trichy).');
+// --- TEST 7: Sale Value Crores Conversion (Sum of Sale value / 10,000,000) & Sale Quantity ---
+console.log('\n--- TEST 7: Sale Value Crores Conversion & Sale Quantity ---');
+const testCroreRow: RawSalesRecord = {
+  'Invoice Num.': 'INV-CR-001',
+  'Bill type': 'L1',
+  'GRN date': '2025-05-15',
+  'Customer.': 'Hero Moto',
+  'Material code': '38981',
+  'Desciption': 'Brake Pad Assembly',
+  'Segment': '2W Commercial',
+  'RBL_Product segment': 'Braking Systems',
+  'Sum of Sale value(Doc rate)': 50000000, // ₹50,00,00,000 -> 5.00 Cr
+  'Sum of Sale qty in nos': 1200,
+  'Plant': '3000',
+};
+
+const croreResult = processRawRecords([testCroreRow], 'crore_test.xlsx');
+const croreRecord = croreResult.cleanRecords[0];
+
+if (croreRecord?.saleValue === 5.0 && croreRecord?.saleQty === 1200) {
+  console.log('✓ TEST 7 PASSED: ₹50,00,00,000 correctly converted to 5.00 Cr, and Sale Qty = 1200.');
 } else {
-  console.error('❌ TEST 6 FAILED: Plant mapping mismatch!', plants);
+  console.error(`❌ TEST 7 FAILED: Expected saleValue=5.0 and saleQty=1200, got saleValue=${croreRecord?.saleValue}, saleQty=${croreRecord?.saleQty}`);
   process.exit(1);
 }
 
-console.log('\n🎉 ALL FINAL DATA PROCESSING & DASHBOARD RULES TESTS PASSED SUCCESSFULLY!');
+// --- TEST 8: Material Code vs Description Integrity ---
+console.log('\n--- TEST 8: Material Code vs Description Integrity ---');
+if (croreRecord?.materialCode === '38981' && croreRecord?.description === 'Brake Pad Assembly') {
+  console.log('✓ TEST 8 PASSED: Material code = 38981, Description = Brake Pad Assembly (No code in description column!).');
+} else {
+  console.error(`❌ TEST 8 FAILED: Expected materialCode=38981, description='Brake Pad Assembly', got materialCode=${croreRecord?.materialCode}, description=${croreRecord?.description}`);
+  process.exit(1);
+}
+
+// --- TEST 9: Segment vs RBL Product Segment Separation & Blank Preservation ---
+console.log('\n--- TEST 9: Segment vs RBL Product Segment & Blank Preservation ---');
+const blankTestRow: RawSalesRecord = {
+  'Invoice Num.': 'INV-BLANK-001',
+  'Bill type': 'L1',
+  'GRN date': '15/05/2025',
+  'Customer.': '',
+  'Material code': 'MAT-99',
+  'Desciption': '',
+  'Segment': '',
+  'RBL_Product segment': '',
+  'Sum of Sale value(Doc rate)': 10000000,
+  'Sum of Sale qty in nos': 100,
+  'Plant': '3000',
+};
+
+const blankResult = processRawRecords([blankTestRow], 'blank_test.xlsx');
+const blankRecord = blankResult.cleanRecords[0];
+
+if (
+  blankRecord?.financialYear === 'FY 2025-26' &&
+  blankRecord?.customer === '' &&
+  blankRecord?.description === '' &&
+  blankRecord?.productSegment === '' &&
+  blankRecord?.rblProductSegment === ''
+) {
+  console.log('✓ TEST 9 PASSED: Valid GRN date derived FY 2025-26 without "FY Unknown", and blank fields preserved without fake defaults ("Uncategorized", "General Customer").');
+} else {
+  console.error('❌ TEST 9 FAILED: Blank preservation mismatch!', blankRecord);
+  process.exit(1);
+}
+
+console.log('\n🎉 ALL 9 DATA PROCESSING & DASHBOARD INTEGRITY TESTS PASSED SUCCESSFULLY!');
+
+

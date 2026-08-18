@@ -9,7 +9,7 @@ export const ProcessingAnimation: React.FC = () => {
     'Uploading Excel workbook...',
     'Reading sheets & checking column definitions...',
     'Validating numeric values and date formats...',
-    'Cleaning duplicates and missing attributes...',
+    'Validating data quality and missing attributes...',
     'Generating interactive dashboard & business insights...',
   ];
 

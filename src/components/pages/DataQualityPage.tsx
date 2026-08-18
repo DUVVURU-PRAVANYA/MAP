@@ -113,7 +113,7 @@ export const DataQualityPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
           <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
             <p className="text-slate-400 font-medium">Original Row Count</p>
             <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5">
@@ -131,10 +131,6 @@ export const DataQualityPage: React.FC = () => {
             <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
               {qualitySummary.cleanRecords.toLocaleString()}
             </p>
-          </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-            <p className="text-slate-400 font-medium">Duplicates Cleaned</p>
-            <p className="text-base font-bold text-amber-500 mt-0.5">{qualitySummary.duplicatesRemoved.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
             <p className="text-slate-400 font-medium">Missing Fields Fixed</p>
@@ -175,7 +171,7 @@ export const DataQualityPage: React.FC = () => {
                 {outsideReportingPeriodRecords.map(r => (
                   <tr key={r.id} className="hover:bg-amber-50/30 dark:hover:bg-amber-950/20 font-medium">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-500">{r.id}</td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{r.billDate}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{r.grnDate}</td>
                     <td className="py-3.5 px-4 text-slate-500">{r.financialYear}</td>
                     <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200">{r.customer}</td>
                     <td className="py-3.5 px-4 font-mono">{r.materialCode}</td>

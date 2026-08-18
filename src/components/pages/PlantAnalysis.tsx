@@ -75,7 +75,7 @@ export const PlantAnalysis: React.FC = () => {
   // 2. Scoped KPI Metrics
   const scopedKPIs = useMemo(() => {
     const totalSales = scopedRecords.reduce((sum, r) => sum + r.saleValue, 0);
-    const totalQty = scopedRecords.reduce((sum, r) => sum + r.invQty, 0);
+    const totalQty = scopedRecords.reduce((sum, r) => sum + r.saleQty, 0);
     const masterCustomerCount = new Set(scopedRecords.map(r => r.masterCustomerGroup).filter(Boolean)).size;
     const individualCustomerCount = new Set(scopedRecords.map(r => r.customer).filter(Boolean)).size;
     const productCount = new Set(scopedRecords.map(r => `${r.materialCode}|||${r.description}`)).size;
@@ -103,7 +103,7 @@ export const PlantAnalysis: React.FC = () => {
       );
 
       const sales = plantRecords.reduce((sum, r) => sum + r.saleValue, 0);
-      const quantity = plantRecords.reduce((sum, r) => sum + r.invQty, 0);
+      const quantity = plantRecords.reduce((sum, r) => sum + r.saleQty, 0);
       const masterCustomers = new Set(plantRecords.map(r => r.masterCustomerGroup).filter(Boolean)).size;
       const individualCustomers = new Set(plantRecords.map(r => r.customer).filter(Boolean)).size;
       const products = new Set(plantRecords.map(r => `${r.materialCode}|||${r.description}`)).size;
@@ -157,7 +157,7 @@ export const PlantAnalysis: React.FC = () => {
         };
       }
       map[key].sales += r.saleValue;
-      map[key].quantity += r.invQty;
+      map[key].quantity += r.saleQty;
       map[key].masterCustomers.add(r.masterCustomerGroup || r.customer);
       map[key].invoices.add(r.invoiceNum);
     });
@@ -201,7 +201,7 @@ export const PlantAnalysis: React.FC = () => {
       );
 
       const sales = pRecords.reduce((sum, r) => sum + r.saleValue, 0);
-      const quantity = pRecords.reduce((sum, r) => sum + r.invQty, 0);
+      const quantity = pRecords.reduce((sum, r) => sum + r.saleQty, 0);
       const masterCustomers = new Set(pRecords.map(r => r.masterCustomerGroup).filter(Boolean)).size;
       const invoices = new Set(pRecords.map(r => r.invoiceNum).filter(Boolean)).size;
       const sharePct = Number(((sales / totalProductSales) * 100).toFixed(1));
@@ -272,7 +272,7 @@ export const PlantAnalysis: React.FC = () => {
       }
 
       map[key].sales += r.saleValue;
-      map[key].quantity += r.invQty;
+      map[key].quantity += r.saleQty;
       map[key].products.add(`${r.materialCode}|||${r.description}`);
       map[key].invoices.add(r.invoiceNum);
     });
@@ -307,26 +307,26 @@ export const PlantAnalysis: React.FC = () => {
         fyMap[fy] = { sales: 0, quantity: 0, masterCustomers: new Set(), transactions: 0 };
       }
       fyMap[fy].sales += r.saleValue;
-      fyMap[fy].quantity += r.invQty;
+      fyMap[fy].quantity += r.saleQty;
       fyMap[fy].masterCustomers.add(r.masterCustomerGroup || r.customer);
       fyMap[fy].transactions += 1;
 
       if (!monthMap[r.month]) {
         let sortKey = r.monthSortKey;
         if (sortKey === undefined) {
-          const d = new Date(r.billDate);
+          const d = new Date(r.grnDate);
           sortKey = isNaN(d.getTime()) ? 0 : d.getFullYear() * 12 + d.getMonth();
         }
         monthMap[r.month] = { month: r.month, sales: 0, quantity: 0, sortKey };
       }
       monthMap[r.month].sales += r.saleValue;
-      monthMap[r.month].quantity += r.invQty;
+      monthMap[r.month].quantity += r.saleQty;
 
       if (!qMap[r.quarter]) {
         qMap[r.quarter] = { quarter: r.quarter, sales: 0, quantity: 0 };
       }
       qMap[r.quarter].sales += r.saleValue;
-      qMap[r.quarter].quantity += r.invQty;
+      qMap[r.quarter].quantity += r.saleQty;
     });
 
     const sortedFYs = Object.keys(fyMap).sort();

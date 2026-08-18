@@ -62,10 +62,12 @@ export const OverviewDashboard: React.FC = () => {
     reportingPeriodLabel,
     availableReportingFYs,
     availableSegments,
+    availableRblProductSegments,
     availableProducts,
     availableCustomers,
     availablePlants,
     availableInvoiceNums,
+    toggleRblProductSegmentFilter,
   } = useAnalytics();
 
   const [trendView, setTrendView] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
@@ -84,6 +86,7 @@ export const OverviewDashboard: React.FC = () => {
   const hasActiveFilters =
     filters.financialYears.length > 0 ||
     filters.segments.length > 0 ||
+    (filters.rblProductSegments && filters.rblProductSegments.length > 0) ||
     filters.products.length > 0 ||
     filters.customers.length > 0 ||
     filters.plants.length > 0 ||
@@ -197,6 +200,29 @@ export const OverviewDashboard: React.FC = () => {
             </select>
           </div>
 
+          {/* RBL Product Segment Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">RBL Product Segment</label>
+            <select
+              value={filters.rblProductSegments ? filters.rblProductSegments[0] || '' : ''}
+              onChange={e => {
+                if (e.target.value) {
+                  setFilter('rblProductSegments', [e.target.value]);
+                } else {
+                  setFilter('rblProductSegments', []);
+                }
+              }}
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">All RBL Segments ({availableRblProductSegments.length})</option>
+              {availableRblProductSegments.map(rblSeg => (
+                <option key={rblSeg} value={rblSeg}>
+                  {rblSeg}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Product Filter */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Product</label>
@@ -277,6 +303,17 @@ export const OverviewDashboard: React.FC = () => {
               >
                 <span>Segment: {seg}</span>
                 <button onClick={() => toggleSegmentFilter(seg)} className="hover:text-red-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            {filters.rblProductSegments && filters.rblProductSegments.map(rblSeg => (
+              <span
+                key={rblSeg}
+                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800"
+              >
+                <span>RBL Segment: {rblSeg}</span>
+                <button onClick={() => toggleRblProductSegmentFilter(rblSeg)} className="hover:text-red-500">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -928,32 +965,86 @@ export const OverviewDashboard: React.FC = () => {
             </button>
           </div>
 
-          <div className="space-y-3">
-            {topCustomers.slice(0, 5).map((cust, idx) => (
-              <div
-                key={cust.customer}
-                onClick={() => {
-                  setSelectedCustomer(cust.customer);
-                  setActiveView('customers');
-                }}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-brand-50/50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-600 dark:text-brand-400 font-bold text-xs flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">{cust.customer}</p>
-                    <p className="text-[10px] text-slate-400">{cust.transactionCount} transactions</p>
+          <div className="space-y-2.5 pt-2">
+            {topCustomers.slice(0, 5).map((cust, idx) => {
+              const totalCompanySales = kpiMetrics.totalSalesValue || 1;
+              const contributionPct = Number(((cust.sales / totalCompanySales) * 100).toFixed(1));
+
+              // Pyramid Tier Width & Theme Styling
+              const tierStyles = [
+                {
+                  width: 'w-[70%] sm:w-[66%]',
+                  bg: 'bg-gradient-to-r from-amber-500/15 via-amber-400/25 to-amber-500/15 border-amber-400/70 dark:from-amber-950/70 dark:via-amber-900/60 dark:to-amber-950/70 dark:border-amber-500/80 shadow-md',
+                  badge: 'bg-amber-500 text-white font-black shadow-sm',
+                  salesColor: 'text-amber-700 dark:text-amber-300 font-black',
+                  contribBadge: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-800',
+                },
+                {
+                  width: 'w-[77.5%] sm:w-[74.5%]',
+                  bg: 'bg-gradient-to-r from-indigo-500/10 via-indigo-400/20 to-indigo-500/10 border-indigo-300 dark:from-indigo-950/60 dark:via-indigo-900/50 dark:to-indigo-950/60 dark:border-indigo-700/80 shadow-sm',
+                  badge: 'bg-indigo-600 text-white font-black',
+                  salesColor: 'text-indigo-700 dark:text-indigo-300 font-extrabold',
+                  contribBadge: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+                },
+                {
+                  width: 'w-[85%] sm:w-[83%]',
+                  bg: 'bg-gradient-to-r from-purple-500/10 via-purple-400/15 to-purple-500/10 border-purple-300 dark:from-purple-950/50 dark:via-purple-900/40 dark:to-purple-950/50 dark:border-purple-800/80',
+                  badge: 'bg-purple-600 text-white font-black',
+                  salesColor: 'text-purple-700 dark:text-purple-300 font-extrabold',
+                  contribBadge: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+                },
+                {
+                  width: 'w-[92.5%] sm:w-[91.5%]',
+                  bg: 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80',
+                  badge: 'bg-slate-600 text-white font-black',
+                  salesColor: 'text-slate-900 dark:text-white font-bold',
+                  contribBadge: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+                },
+                {
+                  width: 'w-[100%]',
+                  bg: 'bg-slate-100/80 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/60',
+                  badge: 'bg-slate-500 text-white font-black',
+                  salesColor: 'text-slate-900 dark:text-white font-bold',
+                  contribBadge: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+                },
+              ];
+
+              const tier = tierStyles[idx] || tierStyles[4];
+
+              return (
+                <div
+                  key={cust.customer}
+                  onClick={() => {
+                    setSelectedCustomer(cust.customer);
+                    setActiveView('customers');
+                  }}
+                  className={`${tier.width} ${tier.bg} mx-auto p-3 rounded-2xl border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md flex items-center justify-between gap-2`}
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0 pr-1">
+                    <span className={`w-6 h-6 rounded-lg text-xs flex items-center justify-center shrink-0 ${tier.badge}`}>
+                      #{idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate" title={cust.customer}>
+                        {cust.customer}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {cust.transactionCount.toLocaleString()} txns • {cust.quantity.toLocaleString()} units
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs ${tier.salesColor}`}>
+                      {formatCurrency(cust.sales)}
+                    </p>
+                    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${tier.contribBadge}`}>
+                      {contributionPct}% contribution
+                    </span>
                   </div>
                 </div>
-
-                <div className="text-right">
-                  <p className="text-xs font-black text-slate-900 dark:text-white">{formatCurrency(cust.sales)}</p>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400">{cust.quantity.toLocaleString()} units</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

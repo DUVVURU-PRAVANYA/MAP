@@ -65,7 +65,7 @@ export const CustomerAnalysis: React.FC = () => {
         };
       }
       groupMap[key].sales += r.saleValue;
-      groupMap[key].quantity += r.invQty;
+      groupMap[key].quantity += r.saleQty;
       groupMap[key].products.add(`${r.materialCode}|||${r.description}`);
       groupMap[key].plants.add(r.plantCode);
       groupMap[key].invoices.add(r.invoiceNum);
@@ -105,7 +105,7 @@ export const CustomerAnalysis: React.FC = () => {
           map[fy] = { sales: 0, quantity: 0, products: new Set(), transactions: 0 };
         }
         map[fy].sales += r.saleValue;
-        map[fy].quantity += r.invQty;
+        map[fy].quantity += r.saleQty;
         map[fy].products.add(`${r.materialCode}|||${r.description}`);
         map[fy].transactions += 1;
       });
@@ -140,13 +140,13 @@ export const CustomerAnalysis: React.FC = () => {
         if (!map[r.month]) {
           let sortKey = r.monthSortKey;
           if (sortKey === undefined) {
-            const dateObj = new Date(r.billDate);
+            const dateObj = new Date(r.grnDate);
             sortKey = isNaN(dateObj.getTime()) ? 0 : dateObj.getFullYear() * 12 + dateObj.getMonth();
           }
           map[r.month] = { month: r.month, sales: 0, quantity: 0, sortKey };
         }
         map[r.month].sales += r.saleValue;
-        map[r.month].quantity += r.invQty;
+        map[r.month].quantity += r.saleQty;
       });
 
     return Object.values(map).sort((a, b) => a.sortKey - b.sortKey);
@@ -165,7 +165,7 @@ export const CustomerAnalysis: React.FC = () => {
           map[key] = { description: r.description, segment: r.productSegment, sales: 0, quantity: 0 };
         }
         map[key].sales += r.saleValue;
-        map[key].quantity += r.invQty;
+        map[key].quantity += r.saleQty;
       });
 
     return Object.values(map).sort((a, b) => b.sales - a.sales);

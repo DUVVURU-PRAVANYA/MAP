@@ -29,24 +29,19 @@ export interface CleanSalesRecord {
   masterCustomerGroup: string;
   materialCode: string;
   description: string;
-  product?: string;
-  billDate: string; // ISO format YYYY-MM-DD
-  grnDate: string; // Primary Reporting Date (ISO format YYYY-MM-DD)
-  grnNo?: string;
-  billType: string; // e.g. "L1", "S1", etc. ("L2" excluded)
-  month: string; // Derived from GRN date, e.g. "Apr 2025" or "April"
-  monthSortKey?: number; // Chronological sorting key (year * 12 + monthIndex) from GRN date
-  quarter: string; // Derived from GRN date, e.g. "Q1" or "Q1 FY25"
-  year: number; // Derived from GRN date, e.g. 2025
-  financialYear: string; // Derived from GRN date, e.g. "FY 2024-25"
-  invQty: number;
-  saleValue: number; // Value in Crores directly
-  valueInCrs: number; // Value in Crores
-  saleQty: number;
+  grnDate: string; // ISO format YYYY-MM-DD
+  billType: string;
+  month: string;
+  monthSortKey?: number;
+  quarter: string;
+  year?: number;
+  financialYear: string;
+  saleValue: number; // Sales (Cr) = Sum of Sale value(Doc rate) / 10,000,000
+  saleQty: number; // Sum of Sale qty in nos
   productSegment: string;
-  plantCode: string; // e.g. '3000'
-  plantName: string; // e.g. 'Chennai'
-  invoiceNum: string; // e.g. 'INV-500101'
+  plantCode: string;
+  plantName: string;
+  invoiceNum: string;
   customerPurNum?: string;
   refDocNo?: string;
   oemCustomer?: string;
@@ -129,6 +124,7 @@ export interface FilterState {
   selectedReportingFY?: string;
   financialYears: string[];
   segments: string[];
+  rblProductSegments: string[];
   products: string[];
   customers: string[];
   customerGroups: string[];

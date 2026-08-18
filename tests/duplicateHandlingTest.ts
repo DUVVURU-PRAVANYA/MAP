@@ -94,29 +94,29 @@ console.log(`Duplicates Removed: ${qualitySummary.duplicatesRemoved}`);
 console.log('\n--- TEST 1 & 4: Different Invoice Numbers (INV001 vs INV002) ---');
 const inv1And2 = cleanRecords.filter(r => r.invoiceNum === 'INV001' || r.invoiceNum === 'INV002');
 if (inv1And2.length === 2) {
-  console.log('✓ TEST 1 & 4 PASSED: INV001 and INV002 were BOTH retained (0 false duplicates).');
+  console.log('✓ TEST 1 & 4 PASSED: INV001 and INV002 were BOTH retained.');
 } else {
   console.error(`❌ TEST 1 & 4 FAILED: Expected 2 records, got ${inv1And2.length}`);
   process.exit(1);
 }
 
-// --- TEST 2: Same Invoice Number Duplicate ---
-console.log('\n--- TEST 2: Same Invoice Number (INV003) ---');
+// --- TEST 2: Same Invoice Number Retention (INV003) ---
+console.log('\n--- TEST 2: Same Invoice Number Retention (INV003) ---');
 const inv3 = cleanRecords.filter(r => r.invoiceNum === 'INV003');
-if (inv3.length === 1) {
-  console.log('✓ TEST 2 PASSED: Second occurrence of INV003 was correctly removed as duplicate.');
+if (inv3.length === 2) {
+  console.log('✓ TEST 2 PASSED: Both occurrences of INV003 were correctly RETAINED as valid transaction records.');
 } else {
-  console.error(`❌ TEST 2 FAILED: Expected 1 retained record for INV003, got ${inv3.length}`);
+  console.error(`❌ TEST 2 FAILED: Expected 2 retained records for INV003, got ${inv3.length}`);
   process.exit(1);
 }
 
-// --- TEST 3: Same Invoice Number, Different Other Values ---
-console.log('\n--- TEST 3: Same Invoice Number (INV004) with different other values ---');
+// --- TEST 3: Same Invoice Number with Different Line Items (INV004) ---
+console.log('\n--- TEST 3: Same Invoice Number (INV004) with different line items ---');
 const inv4 = cleanRecords.filter(r => r.invoiceNum === 'INV004');
-if (inv4.length === 1) {
-  console.log('✓ TEST 3 PASSED: Second occurrence of INV004 removed based on Invoice Num. ONLY rule.');
+if (inv4.length === 2 && qualitySummary.duplicatesRemoved === 0) {
+  console.log('✓ TEST 3 PASSED: Both occurrences of INV004 retained (0 duplicates removed).');
 } else {
-  console.error(`❌ TEST 3 FAILED: Expected 1 retained record for INV004, got ${inv4.length}`);
+  console.error(`❌ TEST 3 FAILED: Expected 2 retained records for INV004, got ${inv4.length}`);
   process.exit(1);
 }
 
@@ -138,4 +138,4 @@ if (customerCount === 2) {
   process.exit(1);
 }
 
-console.log('\n🎉 ALL DUPLICATE HANDLING & INVOICE NUM ONLY TESTS PASSED SUCCESSFULLY!');
+console.log('\n🎉 ALL DUPLICATE RETENTION & INVOICE NUM VERIFICATION TESTS PASSED SUCCESSFULLY!');

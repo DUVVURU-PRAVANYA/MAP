@@ -50,21 +50,23 @@ app.post('/api/upload', upload.single('file'), (req: Request, res: Response) => 
     const insights = generateBusinessInsights(result.cleanRecords);
 
     const cleanRecords = result.cleanRecords;
-    const sortedDates = [...cleanRecords].map(r => r.billDate).sort();
-    const minBillDate = sortedDates[0] || 'N/A';
-    const maxBillDate = sortedDates[sortedDates.length - 1] || 'N/A';
+    const sortedDates = [...cleanRecords].map(r => r.grnDate).filter(Boolean).sort();
+    const minGrnDate = sortedDates[0] || 'N/A';
+    const maxGrnDate = sortedDates[sortedDates.length - 1] || 'N/A';
 
     const fyDistribution: Record<string, number> = {};
     cleanRecords.forEach(r => {
-      fyDistribution[r.financialYear] = (fyDistribution[r.financialYear] || 0) + 1;
+      if (r.financialYear) {
+        fyDistribution[r.financialYear] = (fyDistribution[r.financialYear] || 0) + 1;
+      }
     });
 
     console.log(`[BACKEND DIAGNOSTIC] Total parsed records: ${cleanRecords.length}`);
-    console.log(`[BACKEND DIAGNOSTIC] Minimum Bill Date: ${minBillDate}`);
-    console.log(`[BACKEND DIAGNOSTIC] Maximum Bill Date: ${maxBillDate}`);
+    console.log(`[BACKEND DIAGNOSTIC] Minimum GRN Date: ${minGrnDate}`);
+    console.log(`[BACKEND DIAGNOSTIC] Maximum GRN Date: ${maxGrnDate}`);
     console.log(`[BACKEND DIAGNOSTIC] FY Distribution:`, fyDistribution);
-    console.log(`[BACKEND DIAGNOSTIC] First 5 Bill Dates:`, cleanRecords.slice(0, 5).map(r => `${r.id}: ${r.billDate} (${r.financialYear})`));
-    console.log(`[BACKEND DIAGNOSTIC] Last 5 Bill Dates:`, cleanRecords.slice(-5).map(r => `${r.id}: ${r.billDate} (${r.financialYear})`));
+    console.log(`[BACKEND DIAGNOSTIC] First 5 GRN Dates:`, cleanRecords.slice(0, 5).map(r => `${r.id}: ${r.grnDate} (${r.financialYear})`));
+    console.log(`[BACKEND DIAGNOSTIC] Last 5 GRN Dates:`, cleanRecords.slice(-5).map(r => `${r.id}: ${r.grnDate} (${r.financialYear})`));
 
     return res.json({
       success: true,

@@ -16,7 +16,7 @@ export function generateBusinessInsights(records: CleanSalesRecord[]): BusinessI
       fySalesMap[fy] = { sales: 0, quantity: 0, transactions: 0 };
     }
     fySalesMap[fy].sales += r.saleValue;
-    fySalesMap[fy].quantity += r.invQty;
+    fySalesMap[fy].quantity += r.saleQty;
     fySalesMap[fy].transactions += 1;
   });
 

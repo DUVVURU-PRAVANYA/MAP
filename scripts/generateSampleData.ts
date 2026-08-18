@@ -100,6 +100,7 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
       'Material code': product.code,
       'Description': product.name,
       'Bill Date': billDate,
+      'GRN date': billDate,
       'Inv. Qty': invQty,
       'Sale qty in nos': qtyInNos,
       'Value In Crs': valueInCrs,
@@ -111,7 +112,7 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
   }
 
   // Inject a few deliberate edge cases for Data Quality audit verification
-  // 1. A duplicate row
+  // 1. Repeated invoice rows (retained as separate transaction records)
   if (records.length > 5) {
     records.push({ ...records[2] });
     records.push({ ...records[10] });

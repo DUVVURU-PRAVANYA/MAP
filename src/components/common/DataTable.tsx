@@ -9,7 +9,7 @@ interface DataTableProps {
 
 export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Dataset' }) => {
   const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<keyof CleanSalesRecord>('billDate');
+  const [sortField, setSortField] = useState<keyof CleanSalesRecord>('grnDate');
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -147,19 +147,31 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
               </th>
               <th onClick={() => handleSort('productSegment')} className="py-3 px-4 cursor-pointer">
                 <div className="flex items-center space-x-1">
-                  <span>Vehicle Segment</span>
+                  <span>Segment</span>
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                </div>
+              </th>
+              <th onClick={() => handleSort('rblProductSegment')} className="py-3 px-4 cursor-pointer">
+                <div className="flex items-center space-x-1">
+                  <span>RBL Product Segment</span>
+                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                </div>
+              </th>
+              <th onClick={() => handleSort('materialCode')} className="py-3 px-4 cursor-pointer">
+                <div className="flex items-center space-x-1">
+                  <span>Material Code</span>
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
               <th onClick={() => handleSort('description')} className="py-3 px-4 cursor-pointer">
                 <div className="flex items-center space-x-1">
-                  <span>Material Description</span>
+                  <span>Desciption</span>
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
-              <th onClick={() => handleSort('invQty')} className="py-3 px-4 text-right cursor-pointer">
+              <th onClick={() => handleSort('saleQty')} className="py-3 px-4 text-right cursor-pointer">
                 <div className="flex items-center justify-end space-x-1">
-                  <span>Inv Qty</span>
+                  <span>Sum of Sale Qty</span>
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
@@ -175,25 +187,35 @@ export const DataTable: React.FC<DataTableProps> = ({ records, title = 'Sales Da
             {paginated.map((r, i) => (
               <tr key={r.id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                 <td className="py-3 px-4">
-                  <span className="text-[10px] bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">
-                    {r.financialYear}
-                  </span>
+                  {r.financialYear ? (
+                    <span className="text-[10px] bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">
+                      {r.financialYear}
+                    </span>
+                  ) : (
+                    ''
+                  )}
                 </td>
-                <td className="py-3 px-4 font-mono font-medium text-slate-500">{r.grnDate || r.billDate}</td>
+                <td className="py-3 px-4 font-mono font-medium text-slate-500">{r.grnDate}</td>
                 <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300 font-semibold">{r.invoiceNum}</td>
                 <td className="py-3 px-4 font-bold text-amber-600 dark:text-amber-400">{r.plantName}</td>
                 <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">{r.customer}</td>
                 <td className="py-3 px-4">
-                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-semibold">
-                    {r.productSegment}
-                  </span>
+                  {r.productSegment ? (
+                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-semibold">
+                      {r.productSegment}
+                    </span>
+                  ) : (
+                    ''
+                  )}
                 </td>
+                <td className="py-3 px-4 font-medium text-slate-600 dark:text-slate-400">{r.rblProductSegment}</td>
+                <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">{r.materialCode}</td>
                 <td className="py-3 px-4 font-medium text-slate-800 dark:text-slate-200">{r.description}</td>
-                <td className="py-3 px-4 text-right font-semibold">{r.invQty}</td>
+                <td className="py-3 px-4 text-right font-semibold">{r.saleQty}</td>
                 <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-white">
                   ₹{r.saleValue.toFixed(2)} Cr
                 </td>
-                </tr>
+              </tr>
             ))}
           </tbody>
         </table>

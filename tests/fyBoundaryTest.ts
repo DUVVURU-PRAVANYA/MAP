@@ -12,9 +12,9 @@ const testCases = [
   { raw: '2023-04-01', expectedFY: 'FY 2023-24', expectedISO: '2023-04-01' },
   { raw: '2024-03-31', expectedFY: 'FY 2023-24', expectedISO: '2024-03-31' },
   { raw: '10-May-2022', expectedFY: 'FY 2022-23', expectedISO: '2022-05-10' },
-  { raw: '', expectedFY: 'FY Unknown', expectedISO: '' },
-  { raw: null, expectedFY: 'FY Unknown', expectedISO: '' },
-  { raw: 'invalid-date', expectedFY: 'FY Unknown', expectedISO: '' },
+  { raw: '', expectedFY: '', expectedISO: '' },
+  { raw: null, expectedFY: '', expectedISO: '' },
+  { raw: 'invalid-date', expectedFY: '', expectedISO: '' },
 ];
 
 let passed = 0;

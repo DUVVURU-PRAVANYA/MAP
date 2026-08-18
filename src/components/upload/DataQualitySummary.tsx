@@ -216,10 +216,6 @@ export const DataQualitySummary: React.FC = () => {
                   <span className="font-mono font-bold">-{qualitySummary.l2RecordsRemoved.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-700/60 text-amber-400">
-                  <span>Duplicate Records Removed (Invoice Num)</span>
-                  <span className="font-mono font-bold">-{qualitySummary.duplicatesRemoved.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-700/60 text-amber-400">
                   <span>Invalid / Non-Numeric Rows Removed</span>
                   <span className="font-mono font-bold">-{qualitySummary.invalidRecordsRemoved.toLocaleString()}</span>
                 </div>

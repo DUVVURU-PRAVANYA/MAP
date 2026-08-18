@@ -24,7 +24,7 @@ export const SegmentAnalysis: React.FC = () => {
           map[fy] = { sales: 0, quantity: 0, customers: new Set(), products: new Set(), transactions: 0 };
         }
         map[fy].sales += r.saleValue;
-        map[fy].quantity += r.invQty;
+        map[fy].quantity += r.saleQty;
         map[fy].customers.add(r.customer);
         map[fy].products.add(`${r.materialCode}|||${r.description}`);
         map[fy].transactions += 1;
@@ -73,7 +73,7 @@ export const SegmentAnalysis: React.FC = () => {
           map[key] = { materialCode: r.materialCode, description: r.description, sales: 0, quantity: 0, customers: new Set() };
         }
         map[key].sales += r.saleValue;
-        map[key].quantity += r.invQty;
+        map[key].quantity += r.saleQty;
         map[key].customers.add(r.customer);
       });
 
@@ -92,7 +92,7 @@ export const SegmentAnalysis: React.FC = () => {
           map[r.customer] = { customer: r.customer, sales: 0, quantity: 0 };
         }
         map[r.customer].sales += r.saleValue;
-        map[r.customer].quantity += r.invQty;
+        map[r.customer].quantity += r.saleQty;
       });
 
     return Object.values(map).sort((a, b) => b.sales - a.sales).slice(0, 6);
@@ -109,13 +109,13 @@ export const SegmentAnalysis: React.FC = () => {
         if (!map[r.month]) {
           let sortKey = r.monthSortKey;
           if (sortKey === undefined) {
-            const dateObj = new Date(r.billDate);
+            const dateObj = new Date(r.grnDate);
             sortKey = isNaN(dateObj.getTime()) ? 0 : dateObj.getFullYear() * 12 + dateObj.getMonth();
           }
           map[r.month] = { month: r.month, sales: 0, quantity: 0, sortKey };
         }
         map[r.month].sales += r.saleValue;
-        map[r.month].quantity += r.invQty;
+        map[r.month].quantity += r.saleQty;
       });
 
     return Object.values(map).sort((a, b) => a.sortKey - b.sortKey);
@@ -133,7 +133,7 @@ export const SegmentAnalysis: React.FC = () => {
           map[r.quarter] = { quarter: r.quarter, sales: 0, quantity: 0 };
         }
         map[r.quarter].sales += r.saleValue;
-        map[r.quarter].quantity += r.invQty;
+        map[r.quarter].quantity += r.saleQty;
       });
 
     const quarterOrder = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -181,7 +181,7 @@ export const SegmentAnalysis: React.FC = () => {
               <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
                 <div>
                   <p className="text-slate-400">Sales Value</p>
-                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">₹{(seg.sales / 100000).toFixed(1)}L</p>
+                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">₹{seg.sales.toFixed(2)} Cr</p>
                 </div>
                 <div>
                   <p className="text-slate-400">Inv Qty / SKUs</p>
