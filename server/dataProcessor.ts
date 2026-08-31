@@ -195,7 +195,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   masterCustomerGroup: ['mastercustomergroup', 'mastercustgroup', 'mastergroup', 'parentgroup'],
   materialCode: ['materialcode', 'itemcode', 'productcode', 'matcode'],
   description: ['desciption', 'description', 'materialdescription', 'productdescription', 'itemname'],
-  grnDate: ['grndate', 'grn_date', 'grn date', 'grn', 'grndt', 'date', 'billdate', 'invoicedate'],
+  grnDate: ['grndate', 'grn_date', 'grndat', 'grndt', 'grn'],
   billType: ['billtype', 'bill_type', 'type'],
   customerPurNum: ['customerpurnum', 'customerpurno', 'purnum', 'purno'],
   refDocNo: ['refdocno', 'refdocnumber', 'refno'],
@@ -203,7 +203,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   rblProductSegment: ['rblproductsegment', 'rbl_productsegment', 'rblsegment'],
   organicNpd: ['organicnpd', 'organic', 'npd'],
   aopOem: ['aopoem', 'aop'],
-  application: ['application', 'usecase'],
+  application: ['application', 'usecase', 'app', 'applicationname', 'enduseapplication', 'vehicleapplication', 'applications', 'applicationtype'],
   saleValue: ['sumofsalevaluedocrate', 'salevaluedocrate', 'salevalue', 'salesvalue', 'amount', 'totalsales', 'valueincrs', 'sumofvalueincrs'],
   saleQty: ['sumofsaleqtyinnos', 'saleqtyinnos', 'saleqty', 'salesqty', 'quantity', 'invqty', 'sumofinvqty', 'invoiceqty'],
   productSegment: ['segment', 'vehiclesegment', 'productsegment', 'category'],
@@ -231,6 +231,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   const flaggedRows: { rowNumber: number; issue: string; rawData: Record<string, any> }[] = [];
 
   let l2RecordsCount = 0;
+  let l2TotalValue = 0;
   let invalidRecordsCount = 0;
   let missingValuesFixedCount = 0;
   let quantityMismatchCount = 0;
@@ -299,11 +300,13 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
 
     const getValByConcept = (conceptKey: keyof typeof HEADER_ALIASES) => {
       const aliases = HEADER_ALIASES[conceptKey];
-      for (const rk of Object.keys(row)) {
-        const normKey = normalizeHeader(rk);
-        if (aliases.includes(normKey)) {
-          const val = row[rk];
-          if (val !== undefined && val !== null) return val;
+      for (const alias of aliases) {
+        for (const rk of Object.keys(row)) {
+          const normKey = normalizeHeader(rk);
+          if (normKey === alias) {
+            const val = row[rk];
+            if (val !== undefined && val !== null && String(val).trim() !== '') return val;
+          }
         }
       }
       return '';
@@ -314,6 +317,9 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
     const billType = rawBillType || 'L1';
     if (String(billType).trim().toUpperCase() === 'L2') {
       l2RecordsCount++;
+      const rawL2SaleVal = getValByConcept('saleValue');
+      const l2ValNum = parseNumeric(rawL2SaleVal);
+      l2TotalValue += (l2ValNum / 10000000);
       flaggedRows.push({
         rowNumber: rowNum,
         issue: 'Bill Type = L2 Record Excluded',
@@ -411,6 +417,7 @@ export function processRawRecords(rawData: RawSalesRecord[], filename: string): 
   const qualitySummary: DataQualitySummary = {
     originalRecords,
     l2RecordsRemoved: l2RecordsCount,
+    l2TotalValue: Number(l2TotalValue.toFixed(4)),
     duplicatesRemoved: 0,
     invalidRecordsRemoved: invalidRecordsCount,
     missingValuesFixed: missingValuesFixedCount,

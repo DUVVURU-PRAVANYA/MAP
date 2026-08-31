@@ -39,8 +39,15 @@ export const SegmentAnalysis: React.FC = () => {
       const prevCustomers = prevData?.customers.size;
 
       let yoyGrowthPct: number | null = null;
-      if (prevSales !== undefined && prevSales > 0) {
-        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+      let yoyGrowthStatus = 'N/A — No Prior FY in Dataset';
+
+      if (prevSales !== undefined) {
+        if (prevSales <= 0) {
+          yoyGrowthStatus = 'N/A — No Previous-Year Sales';
+        } else {
+          yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+          yoyGrowthStatus = `${yoyGrowthPct >= 0 ? '+' : ''}${yoyGrowthPct}%`;
+        }
       }
 
       const productDiff = prevProducts !== undefined ? data.products.size - prevProducts : 0;
@@ -54,6 +61,7 @@ export const SegmentAnalysis: React.FC = () => {
         products: data.products.size,
         transactions: data.transactions,
         yoyGrowthPct,
+        yoyGrowthStatus,
         productDiff,
         customerDiff,
       };
@@ -279,7 +287,7 @@ export const SegmentAnalysis: React.FC = () => {
                     <tr key={fyRow.financialYear} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium">
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{fyRow.financialYear}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
-                        ₹{(fyRow.sales / 100000).toFixed(2)} Lakhs
+                        ₹{fyRow.sales.toFixed(2)} Cr
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold">
                         {fyRow.yoyGrowthPct !== null && fyRow.yoyGrowthPct !== undefined ? (
@@ -287,7 +295,7 @@ export const SegmentAnalysis: React.FC = () => {
                             {fyRow.yoyGrowthPct >= 0 ? '+' : ''}{fyRow.yoyGrowthPct}%
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-normal">Base Year</span>
+                          <span className="text-slate-500 dark:text-slate-400 font-normal text-[11px]">{fyRow.yoyGrowthStatus || 'Base Year'}</span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
@@ -317,17 +325,15 @@ export const SegmentAnalysis: React.FC = () => {
             </div>
           </div>
 
-          {/* Hierarchy Step 1: Products within Segment (Material Code + Description) */}
+          {/* Hierarchy Step 1: Products (SKUs) in this Segment */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-              Products within Segment ({segmentTopProducts.length} SKUs)
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-3">
+              Products (SKUs) in "{activeSegmentData.segment}" ({segmentTopProducts.length} Items)
             </h3>
-            <p className="text-xs text-slate-400 mb-4">True Hierarchy: Vehicle Segment → Material Code + Description</p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {segmentTopProducts.map(prod => (
                 <div
-                  key={`${prod.materialCode}-${prod.description}`}
+                  key={prod.description}
                   onClick={() => {
                     setSelectedProduct(prod.description);
                     setActiveView('products');
@@ -339,7 +345,7 @@ export const SegmentAnalysis: React.FC = () => {
                   <div className="flex justify-between items-center pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
                     <span className="text-slate-400">{prod.quantity.toLocaleString()} units</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      ₹{(prod.sales / 100000).toFixed(1)}L
+                      ₹{prod.sales.toFixed(2)} Cr
                     </span>
                   </div>
                 </div>
@@ -367,7 +373,7 @@ export const SegmentAnalysis: React.FC = () => {
                     <p className="text-[10px] text-slate-400">{cust.quantity.toLocaleString()} units</p>
                   </div>
                   <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                    ₹{(cust.sales / 100000).toFixed(1)}L
+                    ₹{cust.sales.toFixed(2)} Cr
                   </span>
                 </div>
               ))}
@@ -386,8 +392,8 @@ export const SegmentAnalysis: React.FC = () => {
                   <BarChart data={segmentMonthlyTrend}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <YAxis tickFormatter={v => `₹${Number(v).toFixed(1)}Cr`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toFixed(2)} Cr`, 'Sales Value']} />
                     <Bar dataKey="sales" fill="#0c8de9" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -404,8 +410,8 @@ export const SegmentAnalysis: React.FC = () => {
                   <BarChart data={segmentQuarterlyTrend}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                     <XAxis dataKey="quarter" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <YAxis tickFormatter={v => `₹${Number(v).toFixed(1)}Cr`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toFixed(2)} Cr`, 'Sales Value']} />
                     <Bar dataKey="sales" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -422,8 +428,8 @@ export const SegmentAnalysis: React.FC = () => {
                   <BarChart data={segmentYearlyBreakdown}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                     <XAxis dataKey="financialYear" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <YAxis tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Sales Value']} />
+                    <YAxis tickFormatter={v => `₹${Number(v).toFixed(1)}Cr`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip formatter={(val: any) => [`₹${Number(val).toFixed(2)} Cr`, 'Sales Value']} />
                     <Bar dataKey="sales" fill="#10b981" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

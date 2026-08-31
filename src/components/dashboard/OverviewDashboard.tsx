@@ -15,7 +15,6 @@ import {
 } from 'recharts';
 import {
   IndianRupee,
-  ShoppingBag,
   Boxes,
   Users,
   Package,
@@ -23,6 +22,7 @@ import {
   Receipt,
   TrendingUp,
   Filter,
+  Search,
   X,
   RefreshCw,
   ArrowUpRight,
@@ -30,6 +30,8 @@ import {
   PieChartIcon,
   BarChart2,
   ChevronRight,
+  ShieldAlert,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAnalytics } from '../../context/AnalyticsContext';
 
@@ -40,6 +42,7 @@ export const OverviewDashboard: React.FC = () => {
     segmentBreakdown,
     plantBreakdown,
     topProducts,
+    topApplications,
     topCustomers,
     quarterlyBreakdown,
     availableFinancialYears,
@@ -54,6 +57,8 @@ export const OverviewDashboard: React.FC = () => {
     toggleInvoiceNumFilter,
     clearAllFilters,
     allRecords,
+    filteredRecords,
+    qualitySummary,
     setActiveView,
     setSelectedProduct,
     setSelectedCustomer,
@@ -65,6 +70,7 @@ export const OverviewDashboard: React.FC = () => {
     availableRblProductSegments,
     availableProducts,
     availableCustomers,
+    availableMasterCustomerGroups,
     availablePlants,
     availableInvoiceNums,
     toggleRblProductSegmentFilter,
@@ -73,9 +79,15 @@ export const OverviewDashboard: React.FC = () => {
   const [trendView, setTrendView] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [segmentChartType, setSegmentChartType] = useState<'bar' | 'donut'>('donut');
   const [productMetricType, setProductMetricType] = useState<'sales' | 'quantity'>('sales');
+  const [appMetricType, setAppMetricType] = useState<'sales' | 'quantity'>('sales');
   const [quarterMetricType, setQuarterMetricType] = useState<'sales' | 'quantity' | 'customers'>('sales');
 
-  // Helper formatting INR in Crores (Value In Crs is already in Crores)
+  // Dynamic Selection Filter States (Section 1 & 2: Exactly 2 Controls)
+  const [selectedField, setSelectedField] = useState<string>('plant');
+  const [comboboxQuery, setComboboxQuery] = useState<string>('');
+  const [isComboboxOpen, setIsComboboxOpen] = useState<boolean>(false);
+
+  // Helper formatting INR in Crores
   const formatCurrency = (val: number) => {
     if (val === undefined || val === null || isNaN(val)) return '₹0.00 Cr';
     return `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Cr`;
@@ -83,15 +95,148 @@ export const OverviewDashboard: React.FC = () => {
 
   const SEGMENT_COLORS = ['#0c8de9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
 
+  // Supported Selection Filter Fields (Section 1)
+  const FILTER_FIELDS = [
+    { key: 'plant', label: 'Plant' },
+    { key: 'masterCustomerGroup', label: 'Master customer Group' },
+    { key: 'customerGroup', label: 'Customer Group' },
+    { key: 'customer', label: 'Customer.' },
+    { key: 'custNum', label: 'Cust Num.' },
+    { key: 'application', label: 'Application' },
+    { key: 'productSegment', label: 'Segment' },
+    { key: 'rblProductSegment', label: 'RBL_Product segment' },
+    { key: 'materialCode', label: 'Material code' },
+    { key: 'description', label: 'Desciption' },
+    { key: 'invoiceNum', label: 'Invoice Num.' },
+    { key: 'billType', label: 'Bill type' },
+    { key: 'grnDate', label: 'GRN date' },
+    { key: 'month', label: 'Month' },
+  ];
+
+  // Indian Financial Year Month Sorting Order (Section 2)
+  const INDIAN_FY_MONTH_ORDER = [
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+    'January',
+    'February',
+    'March',
+  ];
+
+  // Dynamically compute distinct unique values from the clean dataset for the selected field
+  const distinctFieldValues = useMemo(() => {
+    if (!selectedField) return [];
+    const valSet = new Set<string>();
+
+    allRecords.forEach(r => {
+      let rawVal = '';
+      if (selectedField === 'plant') rawVal = r.plantName || r.plantCode || '';
+      else if (selectedField === 'masterCustomerGroup') rawVal = r.masterCustomerGroup || '';
+      else if (selectedField === 'customerGroup') rawVal = r.customerGroup || '';
+      else if (selectedField === 'customer') rawVal = r.customer || '';
+      else if (selectedField === 'custNum') rawVal = r.custNum || '';
+      else if (selectedField === 'application') rawVal = r.application || '';
+      else if (selectedField === 'productSegment') rawVal = r.productSegment || '';
+      else if (selectedField === 'rblProductSegment') rawVal = r.rblProductSegment || '';
+      else if (selectedField === 'materialCode') rawVal = r.materialCode || '';
+      else if (selectedField === 'description') rawVal = r.description || '';
+      else if (selectedField === 'invoiceNum') rawVal = r.invoiceNum || '';
+      else if (selectedField === 'billType') rawVal = r.billType || '';
+      else if (selectedField === 'grnDate') rawVal = r.grnDate || '';
+      else if (selectedField === 'month') rawVal = r.month || '';
+
+      if (rawVal && String(rawVal).trim() !== '') {
+        valSet.add(String(rawVal).trim());
+      }
+    });
+
+    const valuesList = Array.from(valSet);
+
+    // If Month, sort strictly in Indian FY order (April -> March) per Section 2
+    if (selectedField === 'month') {
+      return valuesList.sort((a, b) => {
+        const idxA = INDIAN_FY_MONTH_ORDER.findIndex(m => a.toLowerCase().includes(m.toLowerCase()));
+        const idxB = INDIAN_FY_MONTH_ORDER.findIndex(m => b.toLowerCase().includes(m.toLowerCase()));
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    }
+
+    return valuesList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [allRecords, selectedField]);
+
+  // Filtered suggestions while typing in the combobox
+  const filteredSuggestions = useMemo(() => {
+    if (!comboboxQuery) return distinctFieldValues;
+    const q = comboboxQuery.toLowerCase();
+    return distinctFieldValues.filter(val => val.toLowerCase().includes(q));
+  }, [distinctFieldValues, comboboxQuery]);
+
+  // Handler for applying the selected value
+  const handleSelectComboboxValue = (val: string) => {
+    setComboboxQuery(val === 'ALL' ? '' : val);
+    setIsComboboxOpen(false);
+
+    if (!val || val === 'ALL') {
+      // Clear specific filters
+      if (selectedField === 'plant') setFilter('plants', []);
+      else if (selectedField === 'masterCustomerGroup') setFilter('masterCustomerGroups', []);
+      else if (selectedField === 'customerGroup') setFilter('customerGroups', []);
+      else if (selectedField === 'customer') setFilter('customers', []);
+      else if (selectedField === 'productSegment') setFilter('segments', []);
+      else if (selectedField === 'rblProductSegment') setFilter('rblProductSegments', []);
+      else if (selectedField === 'invoiceNum') setFilter('invoiceNums', []);
+      else if (selectedField === 'materialCode' || selectedField === 'description') setFilter('products', []);
+      else setFilter('searchTerm', '');
+      return;
+    }
+
+    // Apply the chosen distinct value across dashboard analysis
+    if (selectedField === 'plant') {
+      setFilter('plants', [val]);
+    } else if (selectedField === 'masterCustomerGroup') {
+      setFilter('masterCustomerGroups', [val]);
+    } else if (selectedField === 'customerGroup') {
+      setFilter('customerGroups', [val]);
+    } else if (selectedField === 'customer') {
+      setFilter('customers', [val]);
+    } else if (selectedField === 'productSegment') {
+      setFilter('segments', [val]);
+    } else if (selectedField === 'rblProductSegment') {
+      setFilter('rblProductSegments', [val]);
+    } else if (selectedField === 'invoiceNum') {
+      setFilter('invoiceNums', [val]);
+    } else if (selectedField === 'materialCode' || selectedField === 'description') {
+      setFilter('products', [val]);
+    } else {
+      setFilter('searchTerm', val);
+    }
+  };
+
   const hasActiveFilters =
     filters.financialYears.length > 0 ||
     filters.segments.length > 0 ||
     (filters.rblProductSegments && filters.rblProductSegments.length > 0) ||
     filters.products.length > 0 ||
     filters.customers.length > 0 ||
+    filters.customerGroups.length > 0 ||
     filters.plants.length > 0 ||
+    filters.masterCustomerGroups.length > 0 ||
     filters.invoiceNums.length > 0 ||
-    filters.searchTerm !== '';
+    filters.searchTerm !== '' ||
+    comboboxQuery !== '' ||
+    Boolean(selectedReportingFY && selectedReportingFY !== 'ALL' && selectedReportingFY !== 'All Years');
+
+  const l2TotalValue = qualitySummary?.l2TotalValue ?? 0;
+  const currentFieldLabel = FILTER_FIELDS.find(f => f.key === selectedField)?.label || 'Field';
 
   return (
     <div className="space-y-6 pb-12 font-sans">
@@ -100,16 +245,21 @@ export const OverviewDashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Sales Overview</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Financial Year Performance & Real-time Analytics (Value in Crores)
+            Real-time Sales Performance & Analytics (Value in Crores)
           </p>
         </div>
 
-        {/* Global Filter Bar */}
+        {/* Reset Filter Button */}
         <div className="flex items-center space-x-2">
           {hasActiveFilters && (
             <button
-              onClick={clearAllFilters}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-300 hover:bg-red-100 transition-colors"
+              onClick={() => {
+                clearAllFilters();
+                setSelectedReportingFY('');
+                setComboboxQuery('');
+                setIsComboboxOpen(false);
+              }}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-red-600 bg-red-50 dark:bg-red-950/40 dark:text-red-300 hover:bg-red-100 transition-colors border border-red-200 dark:border-red-800 shadow-sm"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Reset Filters</span>
@@ -118,162 +268,155 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Global Filter Controls */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card space-y-3">
-        <div className="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-          <Filter className="w-3.5 h-3.5 text-brand-500" />
-          <span>Global Search & Filter Controls</span>
+      {/* APPROVED TWO FILTER SYSTEM (Section 1: Filter 1 Field Selector + Filter 2 Searchable Combobox) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <SlidersHorizontal className="w-4 h-4 text-brand-500" />
+            <span>Dashboard Filters (2 Controls: Field Selector & Searchable Combobox)</span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">Exactly 2 Filter Controls</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
-          {/* Financial Year Selector */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* FILTER 1: FIELD SELECTOR */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Financial Year</label>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-brand-500" />
+              <span>Filter 1 — Field Selector</span>
+            </label>
             <select
-              value={selectedReportingFY}
-              onChange={e => setSelectedReportingFY(e.target.value)}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-brand-300 dark:border-brand-800 bg-brand-50/50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-extrabold text-brand-600 dark:text-brand-400"
+              value={selectedField}
+              onChange={e => {
+                const newField = e.target.value;
+                setSelectedField(newField);
+                setComboboxQuery('');
+                handleSelectComboboxValue('ALL');
+              }}
+              className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-brand-300 dark:border-brand-800 bg-brand-50/30 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-bold shadow-sm"
             >
-              <option value="">All Years</option>
-              {availableReportingFYs.map(fy => (
-                <option key={fy} value={fy}>
-                  {fy}
+              {FILTER_FIELDS.map(f => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Plant Filter */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Plant Location</label>
-            <select
-              value={filters.plants[0] || ''}
-              onChange={e => {
-                if (e.target.value) {
-                  setFilter('plants', [e.target.value]);
-                } else {
-                  setFilter('plants', []);
-                }
-              }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-brand-300 dark:border-brand-800 bg-brand-50/30 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-bold"
-            >
-              <option value="">All Plants</option>
-              <option value="Chennai">Chennai (3000)</option>
-              <option value="Hyderabad">Hyderabad (3100)</option>
-              <option value="Pondicherry">Pondicherry (3200)</option>
-              <option value="Trichy">Trichy (3600)</option>
-            </select>
-          </div>
+          {/* FILTER 2: SEARCHABLE DISTINCT-VALUE COMBOBOX */}
+          <div className="relative">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-brand-500" />
+                <span>Filter 2 — Search / Select {currentFieldLabel}</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">
+                {distinctFieldValues.length} distinct values
+              </span>
+            </label>
 
-          {/* Search Keywords */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Search Keywords</label>
-            <input
-              type="text"
-              placeholder="Search product, customer, invoice..."
-              value={filters.searchTerm}
-              onChange={e => setFilter('searchTerm', e.target.value)}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Search or select ${currentFieldLabel}...`}
+                value={comboboxQuery}
+                onFocus={() => setIsComboboxOpen(true)}
+                onChange={e => {
+                  setComboboxQuery(e.target.value);
+                  setIsComboboxOpen(true);
+                  if (e.target.value === '') {
+                    handleSelectComboboxValue('ALL');
+                  }
+                }}
+                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold shadow-sm pr-16"
+              />
 
-          {/* Vehicle Segment Filter */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vehicle Segment</label>
-            <select
-              value={filters.segments[0] || ''}
-              onChange={e => {
-                if (e.target.value) {
-                  setFilter('segments', [e.target.value]);
-                } else {
-                  setFilter('segments', []);
-                }
-              }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">All Vehicle Segments ({availableSegments.length})</option>
-              {availableSegments.map(seg => (
-                <option key={seg} value={seg}>
-                  {seg}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
+                {comboboxQuery && (
+                  <button
+                    onClick={() => {
+                      setComboboxQuery('');
+                      handleSelectComboboxValue('ALL');
+                    }}
+                    className="p-1 rounded text-slate-400 hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsComboboxOpen(!isComboboxOpen)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isComboboxOpen ? 'rotate-90' : ''}`} />
+                </button>
+              </div>
+            </div>
 
-          {/* RBL Product Segment Filter */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">RBL Product Segment</label>
-            <select
-              value={filters.rblProductSegments ? filters.rblProductSegments[0] || '' : ''}
-              onChange={e => {
-                if (e.target.value) {
-                  setFilter('rblProductSegments', [e.target.value]);
-                } else {
-                  setFilter('rblProductSegments', []);
-                }
-              }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">All RBL Segments ({availableRblProductSegments.length})</option>
-              {availableRblProductSegments.map(rblSeg => (
-                <option key={rblSeg} value={rblSeg}>
-                  {rblSeg}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Suggestions Dropdown */}
+            {isComboboxOpen && (
+              <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 text-xs divide-y divide-slate-100 dark:divide-slate-800">
+                <button
+                  type="button"
+                  onClick={() => handleSelectComboboxValue('ALL')}
+                  className="w-full text-left px-3.5 py-2 font-bold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-slate-800 flex items-center justify-between"
+                >
+                  <span>All {currentFieldLabel}s (No filter)</span>
+                  <span className="text-[10px] text-slate-400">Reset</span>
+                </button>
 
-          {/* Product Filter */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Product</label>
-            <select
-              value={filters.products[0] || ''}
-              onChange={e => {
-                if (e.target.value) {
-                  setFilter('products', [e.target.value]);
-                } else {
-                  setFilter('products', []);
-                }
-              }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">All Products ({availableProducts.length})</option>
-              {availableProducts.map(prod => (
-                <option key={prod} value={prod}>
-                  {prod}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Customer Filter */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Customer Account</label>
-            <select
-              value={filters.customers[0] || ''}
-              onChange={e => {
-                if (e.target.value) {
-                  setFilter('customers', [e.target.value]);
-                } else {
-                  setFilter('customers', []);
-                }
-              }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">All Customers ({availableCustomers.length})</option>
-              {availableCustomers.map(cust => (
-                <option key={cust} value={cust}>
-                  {cust}
-                </option>
-              ))}
-            </select>
+                {filteredSuggestions.length === 0 ? (
+                  <div className="px-3.5 py-3 text-slate-400 text-center italic">
+                    No matching {currentFieldLabel} values found
+                  </div>
+                ) : (
+                  filteredSuggestions.map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => handleSelectComboboxValue(val)}
+                      className={`w-full text-left px-3.5 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between ${
+                        comboboxQuery === val ? 'bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 font-bold' : 'text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <span className="truncate">{val}</span>
+                      {selectedField === 'month' && (
+                        <span className="text-[10px] text-slate-400 ml-2 shrink-0">FY Month</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Active Filter Chips */}
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <span className="text-[11px] font-bold text-slate-400">ACTIVE FILTERS:</span>
+            <span className="text-[11px] font-bold text-slate-400">ACTIVE FILTER:</span>
+            {comboboxQuery && (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                <span>{currentFieldLabel}: {comboboxQuery}</span>
+                <button
+                  onClick={() => {
+                    setComboboxQuery('');
+                    handleSelectComboboxValue('ALL');
+                  }}
+                  className="hover:text-red-500"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedReportingFY && selectedReportingFY !== 'ALL' && selectedReportingFY !== 'All Years' && (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                <span>FY: {selectedReportingFY}</span>
+                <button onClick={() => setSelectedReportingFY('')} className="hover:text-red-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             {filters.plants.map(plant => (
               <span
                 key={plant}
@@ -285,21 +428,10 @@ export const OverviewDashboard: React.FC = () => {
                 </button>
               </span>
             ))}
-            {filters.invoiceNums.map(inv => (
-              <span
-                key={inv}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-              >
-                <span>Invoice: {inv}</span>
-                <button onClick={() => toggleInvoiceNumFilter(inv)} className="hover:text-red-500">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
             {filters.segments.map(seg => (
               <span
                 key={seg}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800"
+                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800"
               >
                 <span>Segment: {seg}</span>
                 <button onClick={() => toggleSegmentFilter(seg)} className="hover:text-red-500">
@@ -307,24 +439,13 @@ export const OverviewDashboard: React.FC = () => {
                 </button>
               </span>
             ))}
-            {filters.rblProductSegments && filters.rblProductSegments.map(rblSeg => (
+            {filters.masterCustomerGroups.map(mcg => (
               <span
-                key={rblSeg}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800"
+                key={mcg}
+                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
               >
-                <span>RBL Segment: {rblSeg}</span>
-                <button onClick={() => toggleRblProductSegmentFilter(rblSeg)} className="hover:text-red-500">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-            {filters.products.map(prod => (
-              <span
-                key={prod}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-              >
-                <span>Product: {prod}</span>
-                <button onClick={() => toggleProductFilter(prod)} className="hover:text-red-500">
+                <span>Master Group: {mcg}</span>
+                <button onClick={() => setFilter('masterCustomerGroups', [])} className="hover:text-red-500">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -340,16 +461,13 @@ export const OverviewDashboard: React.FC = () => {
                 </button>
               </span>
             ))}
-            {filters.searchTerm && (
-              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                <span>Keyword: "{filters.searchTerm}"</span>
-                <button onClick={() => setFilter('searchTerm', '')} className="hover:text-red-500">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
             <button
-              onClick={clearAllFilters}
+              onClick={() => {
+                clearAllFilters();
+                setSelectedReportingFY('');
+                setComboboxQuery('');
+                setIsComboboxOpen(false);
+              }}
               className="text-xs font-bold text-slate-500 hover:text-red-600 underline ml-2"
             >
               Clear All
@@ -358,9 +476,9 @@ export const OverviewDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* 7 Core KPI Cards (Invoice Qty as Primary Quantity) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {/* KPI 1: Total Sales Value */}
+      {/* 6 CORE KPI CARDS (Section 2 & Validation: Removed OE/OS, Avg Invoice, Transaction Count, Invoice Style No) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* KPI 1: Total Sales Value (Cr) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Sales (Cr)</span>
@@ -435,32 +553,20 @@ export const OverviewDashboard: React.FC = () => {
           <p className="text-[10px] text-slate-400 mt-1">Vehicle Categories</p>
         </div>
 
-        {/* KPI 6: Total Transactions */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 6: L2 Value (Excluded L2 Records) */}
+        <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Transactions</span>
-            <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
-              <Receipt className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">L2 Value</span>
+            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+              <ShieldAlert className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
-            {kpiMetrics.transactionCount.toLocaleString()}
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate" title={`Excluded L2 Records Value: ₹${l2TotalValue.toFixed(2)} Cr`}>
+            ₹{l2TotalValue.toFixed(2)} Cr
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">Billing Entries</p>
-        </div>
-
-        {/* KPI 7: Average Sale Value */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-card hover:shadow-card-hover transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Avg / Invoice</span>
-            <div className="p-1.5 rounded-lg bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400">
-              <TrendingUp className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <p className="text-lg font-black text-slate-900 dark:text-white mt-1.5 truncate">
-            ₹{kpiMetrics.avgSalesValue.toLocaleString('en-IN')}
+          <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-semibold truncate">
+            {qualitySummary?.l2RecordsRemoved || 0} L2 Excluded
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">Avg Invoice Size</p>
         </div>
       </div>
 
@@ -531,7 +637,9 @@ export const OverviewDashboard: React.FC = () => {
                         {item.yoyGrowthPct >= 0 ? '↑' : '↓'} {Math.abs(item.yoyGrowthPct)}% YoY
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-400 font-medium">Base Year</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                        {item.yoyGrowthStatus || 'Base Year'}
+                      </span>
                     )}
                   </div>
 
@@ -589,7 +697,9 @@ export const OverviewDashboard: React.FC = () => {
                             {fyItem.yoyGrowthPct >= 0 ? '+' : ''}{fyItem.yoyGrowthPct}%
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-normal">-</span>
+                          <span className="text-slate-500 dark:text-slate-400 font-normal text-[11px]">
+                            {fyItem.yoyGrowthStatus || '-'}
+                          </span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
@@ -721,13 +831,13 @@ export const OverviewDashboard: React.FC = () => {
                 tickLine={false}
               />
               <YAxis
-                tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`}
+                tickFormatter={v => `₹${Number(v).toFixed(1)}Cr`}
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
-                formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Sales Value']}
+                formatter={(value: any) => [`₹${Number(value).toFixed(2)} Cr`, 'Sales Value']}
                 contentStyle={{
                   backgroundColor: '#0f172a',
                   borderColor: '#334155',
@@ -749,151 +859,14 @@ export const OverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid: Sales by Segment vs Top Products */}
+      {/* Grid: Top 10 Products & Top 10 Applications (Part 5, 6, 7: Two Separate Independent Visualizations Side-by-Side) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales by Vehicle Segment */}
+        {/* CHART 1: Top 10 Products (Grouping: Description per Part 5) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Sales by Vehicle Segment</h3>
-              <p className="text-xs text-slate-500">Click any vehicle segment to cross-filter dashboard</p>
-            </div>
-            <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-              <button
-                onClick={() => setSegmentChartType('donut')}
-                className={`p-1.5 rounded-md ${
-                  segmentChartType === 'donut' ? 'bg-white dark:bg-slate-900 text-brand-600' : 'text-slate-400'
-                }`}
-                title="Donut Chart"
-              >
-                <PieChartIcon className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setSegmentChartType('bar')}
-                className={`p-1.5 rounded-md ${
-                  segmentChartType === 'bar' ? 'bg-white dark:bg-slate-900 text-brand-600' : 'text-slate-400'
-                }`}
-                title="Bar Chart"
-              >
-                <BarChart2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="h-64 w-full relative z-10">
-            <ResponsiveContainer width="100%" height="100%">
-              {segmentChartType === 'donut' ? (
-                <RePieChart>
-                  <Pie
-                    data={segmentBreakdown}
-                    dataKey="sales"
-                    nameKey="segment"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    onClick={entry => toggleSegmentFilter(entry.segment)}
-                    cursor="pointer"
-                  >
-                    {segmentBreakdown.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={SEGMENT_COLORS[index % SEGMENT_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-xl shadow-2xl z-50 pointer-events-none text-xs space-y-1">
-                            <p className="font-bold text-brand-400 border-b border-slate-800 pb-1">{data.segment}</p>
-                            <p className="text-slate-300 flex justify-between gap-4">
-                              <span>Sales:</span>
-                              <span className="font-mono font-bold text-emerald-400">₹{Number(data.sales).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                            </p>
-                            <p className="text-slate-300 flex justify-between gap-4">
-                              <span>Quantity (Inv. Qty):</span>
-                              <span className="font-mono font-bold text-white">{Number(data.quantity).toLocaleString()}</span>
-                            </p>
-                            <p className="text-slate-300 flex justify-between gap-4">
-                              <span>Transactions:</span>
-                              <span className="font-mono text-slate-400">{data.transactionCount || data.transactions || 0}</span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </RePieChart>
-              ) : (
-                <BarChart data={segmentBreakdown} layout="vertical">
-                  <XAxis type="number" tickFormatter={v => `₹${(v / 100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis dataKey="segment" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={110} />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-xl shadow-2xl z-50 pointer-events-none text-xs space-y-1">
-                            <p className="font-bold text-brand-400 border-b border-slate-800 pb-1">{data.segment}</p>
-                            <p className="text-slate-300 flex justify-between gap-4">
-                              <span>Sales:</span>
-                              <span className="font-mono font-bold text-emerald-400">₹{Number(data.sales).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                            </p>
-                            <p className="text-slate-300 flex justify-between gap-4">
-                              <span>Quantity (Inv. Qty):</span>
-                              <span className="font-mono font-bold text-white">{Number(data.quantity).toLocaleString()}</span>
-                            </p>
-                            <p className="text-slate-300 flex justify-between gap-4">
-                              <span>Transactions:</span>
-                              <span className="font-mono text-slate-400">{data.transactionCount || data.transactions || 0}</span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar
-                    dataKey="sales"
-                    fill="#0c8de9"
-                    radius={[0, 4, 4, 0]}
-                    onClick={entry => toggleSegmentFilter(entry.segment)}
-                    cursor="pointer"
-                  />
-                </BarChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-
-          {/* Segment Legend */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-            {segmentBreakdown.map((seg, idx) => (
-              <button
-                key={seg.segment}
-                onClick={() => toggleSegmentFilter(seg.segment)}
-                className="flex items-center space-x-2 text-left p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <div
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length] }}
-                />
-                <div className="truncate">
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{seg.segment}</p>
-                  <p className="text-[10px] text-slate-400">{seg.percentage}% share</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Products Horizontal Chart */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Top 10 Products</h3>
-              <p className="text-xs text-slate-500">Highest revenue & quantity volume SKUs</p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Top 10 Products by Sales</h3>
+              <p className="text-xs text-slate-500">Ranked by Product Description ({productMetricType === 'sales' ? 'Sales in Cr' : 'Quantity in Nos'})</p>
             </div>
             <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
               <button
@@ -917,27 +890,26 @@ export const OverviewDashboard: React.FC = () => {
 
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProducts.slice(0, 8)} layout="vertical">
+              <BarChart data={topProducts.slice(0, 10)} layout="vertical">
                 <XAxis
                   type="number"
-                  tickFormatter={v => (productMetricType === 'sales' ? `₹${(v / 100000).toFixed(1)}L` : v)}
+                  tickFormatter={v => (productMetricType === 'sales' ? `₹${Number(v).toFixed(1)}Cr` : Number(v).toLocaleString())}
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
                 />
                 <YAxis dataKey="description" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={130} />
                 <Tooltip
                   formatter={(val: any) => [
-                    productMetricType === 'sales' ? `₹${Number(val).toLocaleString('en-IN')}` : Number(val).toLocaleString(),
+                    productMetricType === 'sales' ? `₹${Number(val).toFixed(2)} Cr` : `${Number(val).toLocaleString()} units`,
                     productMetricType === 'sales' ? 'Sales Value' : 'Quantity Sold',
                   ]}
                   contentStyle={{ backgroundColor: '#0f172a', borderRadius: '0.75rem', color: '#fff', fontSize: '12px' }}
                 />
                 <Bar
                   dataKey={productMetricType === 'sales' ? 'sales' : 'quantity'}
-                  fill="#10b981"
+                  fill="#0c8de9"
                   radius={[0, 4, 4, 0]}
                   onClick={entry => {
-                    setSelectedProduct(entry.description);
-                    setActiveView('products');
+                    if (entry.description) toggleProductFilter(entry.description);
                   }}
                   cursor="pointer"
                 />
@@ -945,16 +917,220 @@ export const OverviewDashboard: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {/* CHART 2: Top 10 Applications (Grouping: Application per Part 6) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Top 10 Applications by Sales</h3>
+              <p className="text-xs text-slate-500">Ranked by Vehicle & End-Use Application ({appMetricType === 'sales' ? 'Sales in Cr' : 'Quantity in Nos'})</p>
+            </div>
+            <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+              <button
+                onClick={() => setAppMetricType('sales')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md ${
+                  appMetricType === 'sales' ? 'bg-white dark:bg-slate-900 text-brand-600' : 'text-slate-400'
+                }`}
+              >
+                Sales Value
+              </button>
+              <button
+                onClick={() => setAppMetricType('quantity')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md ${
+                  appMetricType === 'quantity' ? 'bg-white dark:bg-slate-900 text-brand-600' : 'text-slate-400'
+                }`}
+              >
+                Quantity
+              </button>
+            </div>
+          </div>
+
+          <div className="h-72 w-full flex items-center justify-center">
+            {topApplications.length === 0 ? (
+              <div className="text-center p-6 text-slate-400">
+                <Layers className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-300">No Application data available</p>
+                <p className="text-[10px] text-slate-400 mt-1">Application metrics require values in the source Application column</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topApplications.slice(0, 10)} layout="vertical">
+                  <XAxis
+                    type="number"
+                    tickFormatter={v => (appMetricType === 'sales' ? `₹${Number(v).toFixed(1)}Cr` : Number(v).toLocaleString())}
+                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                  />
+                  <YAxis dataKey="application" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={130} />
+                  <Tooltip
+                    formatter={(val: any, _name: any, item: any) => [
+                      appMetricType === 'sales'
+                        ? `₹${Number(val).toFixed(2)} Cr (${item?.payload?.salesContributionPct ?? 0}% contribution)`
+                        : `${Number(val).toLocaleString()} units`,
+                      appMetricType === 'sales' ? 'Sales Value' : 'Quantity Sold',
+                    ]}
+                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '0.75rem', color: '#fff', fontSize: '12px' }}
+                  />
+                  <Bar
+                    dataKey={appMetricType === 'sales' ? 'sales' : 'quantity'}
+                    fill="#10b981"
+                    radius={[0, 4, 4, 0]}
+                    onClick={entry => {
+                      if (entry.application) setFilter('searchTerm', entry.application);
+                    }}
+                    cursor="pointer"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Sales by Vehicle Segment (Full Width Card per User Request) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Sales by Vehicle Segment</h3>
+            <p className="text-xs text-slate-500">Click any vehicle segment to cross-filter dashboard</p>
+          </div>
+          <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+            <button
+              onClick={() => setSegmentChartType('donut')}
+              className={`p-1.5 rounded-md ${
+                segmentChartType === 'donut' ? 'bg-white dark:bg-slate-900 text-brand-600' : 'text-slate-400'
+              }`}
+              title="Donut Chart"
+            >
+              <PieChartIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSegmentChartType('bar')}
+              className={`p-1.5 rounded-md ${
+                segmentChartType === 'bar' ? 'bg-white dark:bg-slate-900 text-brand-600' : 'text-slate-400'
+              }`}
+              title="Bar Chart"
+            >
+              <BarChart2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="h-64 w-full relative z-10">
+          <ResponsiveContainer width="100%" height="100%">
+            {segmentChartType === 'donut' ? (
+              <RePieChart>
+                <Pie
+                  data={segmentBreakdown}
+                  dataKey="sales"
+                  nameKey="segment"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={95}
+                  paddingAngle={3}
+                  onClick={entry => toggleSegmentFilter(entry.segment)}
+                  cursor="pointer"
+                >
+                  {segmentBreakdown.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={SEGMENT_COLORS[index % SEGMENT_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-xl shadow-2xl z-50 pointer-events-none text-xs space-y-1">
+                          <p className="font-bold text-brand-400 border-b border-slate-800 pb-1">{data.segment}</p>
+                          <p className="text-slate-300 flex justify-between gap-4">
+                            <span>Sales:</span>
+                            <span className="font-mono font-bold text-emerald-400">₹{Number(data.sales).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                          </p>
+                          <p className="text-slate-300 flex justify-between gap-4">
+                            <span>Quantity (Inv. Qty):</span>
+                            <span className="font-mono font-bold text-white">{Number(data.quantity).toLocaleString()}</span>
+                          </p>
+                          <p className="text-slate-300 flex justify-between gap-4">
+                            <span>Transactions:</span>
+                            <span className="font-mono text-slate-400">{data.transactionCount || data.transactions || 0}</span>
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </RePieChart>
+            ) : (
+              <BarChart data={segmentBreakdown} layout="vertical">
+                <XAxis type="number" tickFormatter={v => `₹${Number(v).toFixed(1)}Cr`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <YAxis dataKey="segment" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={120} />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-xl shadow-2xl z-50 pointer-events-none text-xs space-y-1">
+                          <p className="font-bold text-brand-400 border-b border-slate-800 pb-1">{data.segment}</p>
+                          <p className="text-slate-300 flex justify-between gap-4">
+                            <span>Sales:</span>
+                            <span className="font-mono font-bold text-emerald-400">₹{Number(data.sales).toFixed(2)} Cr</span>
+                          </p>
+                          <p className="text-slate-300 flex justify-between gap-4">
+                            <span>Quantity (Inv. Qty):</span>
+                            <span className="font-mono font-bold text-white">{Number(data.quantity).toLocaleString()}</span>
+                          </p>
+                          <p className="text-slate-300 flex justify-between gap-4">
+                            <span>Transactions:</span>
+                            <span className="font-mono text-slate-400">{data.transactionCount || data.transactions || 0}</span>
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar
+                  dataKey="sales"
+                  fill="#0c8de9"
+                  radius={[0, 4, 4, 0]}
+                  onClick={entry => toggleSegmentFilter(entry.segment)}
+                  cursor="pointer"
+                />
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+
+        {/* Segment Legend (Responsive Grid across Full Width) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          {segmentBreakdown.map((seg, idx) => (
+            <button
+              key={seg.segment}
+              onClick={() => toggleSegmentFilter(seg.segment)}
+              className="flex items-center space-x-2 text-left p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-800"
+            >
+              <div
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length] }}
+              />
+              <div className="truncate min-w-0">
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{seg.segment}</p>
+                <p className="text-[10px] text-slate-400">{seg.percentage}% share</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid: Top Customers & Quarterly Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Customers Card */}
+        {/* Top Key Account Customers Card (Requirement 5: Master Customer Group level) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">Top Key Account Customers</h3>
-              <p className="text-xs text-slate-500">Highest contribution accounts</p>
+              <p className="text-xs text-slate-500">Highest contribution Master Customer Groups</p>
             </div>
             <button
               onClick={() => setActiveView('customers')}
@@ -1089,12 +1265,12 @@ export const OverviewDashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                 <XAxis dataKey="quarter" tick={{ fontSize: 11, fill: '#94a3b8' }} />
                 <YAxis
-                  tickFormatter={v => (quarterMetricType === 'sales' ? `₹${(v / 100000).toFixed(0)}L` : v)}
+                  tickFormatter={v => (quarterMetricType === 'sales' ? `₹${Number(v).toFixed(1)}Cr` : Number(v).toLocaleString())}
                   tick={{ fontSize: 11, fill: '#94a3b8' }}
                 />
                 <Tooltip
                   formatter={(val: any) => [
-                    quarterMetricType === 'sales' ? `₹${Number(val).toLocaleString('en-IN')}` : Number(val).toLocaleString(),
+                    quarterMetricType === 'sales' ? `₹${Number(val).toFixed(2)} Cr` : Number(val).toLocaleString(),
                     quarterMetricType === 'sales' ? 'Sales Value' : quarterMetricType === 'quantity' ? 'Quantity' : 'Customers',
                   ]}
                   contentStyle={{ backgroundColor: '#0f172a', borderRadius: '0.75rem', color: '#fff', fontSize: '12px' }}

@@ -63,6 +63,7 @@ export interface FinancialYearMetric {
   transactions: number;
   prevSales?: number;
   yoyGrowthPct?: number | null;
+  yoyGrowthStatus?: string;
   prevQuantity?: number;
   qtyGrowthPct?: number | null;
 }
@@ -106,6 +107,7 @@ export interface DataValidationRule {
 export interface DataQualitySummary {
   originalRecords: number;
   l2RecordsRemoved: number;
+  l2TotalValue?: number;
   duplicatesRemoved: number;
   invalidRecordsRemoved: number;
   missingValuesFixed: number;
@@ -117,6 +119,15 @@ export interface DataQualitySummary {
   dateRangeEnd: string;
   validationRules: DataValidationRule[];
   flaggedRows: { rowNumber: number; issue: string; rawData: Record<string, any> }[];
+}
+
+export interface ApplicationMetric {
+  application: string;
+  sales: number;
+  quantity: number;
+  transactionCount: number;
+  salesContributionPct: number;
+  rank: number;
 }
 
 export interface FilterState {
@@ -148,8 +159,8 @@ export interface KPIMetrics {
   invoiceCount: number;
   transactionCount: number;
   avgSalesValue: number;
-  prevPeriodDiffSalesValue?: number; // % change vs prior period
-  prevPeriodDiffQty?: number;
+  prevPeriodDiffSalesValue?: number | null; // % change vs prior period
+  prevPeriodDiffQty?: number | null;
 }
 
 export interface TimeTrendPoint {

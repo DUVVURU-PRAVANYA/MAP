@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "start": "tsx watch server/index.ts",
+    "start": "tsx server/index.ts",
     "lint": "tsc",
     "preview": "vite preview",
     "server": "tsx watch server/index.ts",

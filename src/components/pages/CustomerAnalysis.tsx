@@ -115,9 +115,17 @@ export const CustomerAnalysis: React.FC = () => {
       const data = map[fy];
       const prevSales = idx > 0 ? map[sortedFYs[idx - 1]].sales : undefined;
       let yoyGrowthPct: number | null = null;
-      if (prevSales !== undefined && prevSales > 0) {
-        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+      let yoyGrowthStatus = 'N/A — No Prior FY in Dataset';
+
+      if (prevSales !== undefined) {
+        if (prevSales <= 0) {
+          yoyGrowthStatus = 'N/A — No Previous-Year Sales';
+        } else {
+          yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+          yoyGrowthStatus = `${yoyGrowthPct >= 0 ? '+' : ''}${yoyGrowthPct}%`;
+        }
       }
+
       return {
         financialYear: fy,
         sales: data.sales,
@@ -125,6 +133,7 @@ export const CustomerAnalysis: React.FC = () => {
         products: data.products.size,
         transactions: data.transactions,
         yoyGrowthPct,
+        yoyGrowthStatus,
       };
     });
   }, [allRecords, activeCustomer]);

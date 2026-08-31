@@ -334,9 +334,17 @@ export const PlantAnalysis: React.FC = () => {
       const data = fyMap[fy];
       const prevSales = idx > 0 ? fyMap[sortedFYs[idx - 1]].sales : undefined;
       let yoyGrowthPct: number | null = null;
-      if (prevSales !== undefined && prevSales > 0) {
-        yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+      let yoyGrowthStatus = 'N/A — No Prior FY in Dataset';
+
+      if (prevSales !== undefined) {
+        if (prevSales <= 0) {
+          yoyGrowthStatus = 'N/A — No Previous-Year Sales';
+        } else {
+          yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+          yoyGrowthStatus = `${yoyGrowthPct >= 0 ? '+' : ''}${yoyGrowthPct}%`;
+        }
       }
+
       return {
         financialYear: fy,
         sales: data.sales,
@@ -344,6 +352,7 @@ export const PlantAnalysis: React.FC = () => {
         masterCustomers: data.masterCustomers.size,
         transactions: data.transactions,
         yoyGrowthPct,
+        yoyGrowthStatus,
       };
     });
 
@@ -430,85 +439,126 @@ export const PlantAnalysis: React.FC = () => {
         </div>
       </div>
 
-      {/* 6. SCOPED PLANT KPI CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* 6. SCOPED PLANT KPI CARDS & TARGET COMPARISON (Requirement 6 & 7: Target = ₹120 Cr, Products/Invoices removed) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Sales (Cr) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Sales Value</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Sales Value</span>
+            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
               <IndianRupee className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1.5 truncate">
+          <p className="text-2xl font-black text-slate-900 dark:text-white mt-2 truncate">
             ₹{scopedKPIs.totalSales.toFixed(2)} Cr
           </p>
-          <div className="flex items-center space-x-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>Value In Crs</span>
+          <div className="flex items-center space-x-1 text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>Value in Crores</span>
           </div>
         </div>
 
-        {/* KPI 2: Total Inv. Qty (Nos) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 2: Plant Target Performance (Dynamic: ₹120 Cr per plant / ₹480 Cr for all 4 plants) */}
+        {(() => {
+          const isSinglePlant = Boolean(activePlantFilter && activePlantFilter !== 'ALL' && activePlantFilter !== 'All Plants');
+          const plantScopeCount = isSinglePlant ? 1 : 4;
+          const activePlantTargetCr = plantScopeCount * 120.0;
+          const achievementPct = Number(((scopedKPIs.totalSales / activePlantTargetCr) * 100).toFixed(1));
+          const varianceCr = Number((scopedKPIs.totalSales - activePlantTargetCr).toFixed(2));
+
+          return (
+            <div className="bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl p-4 shadow-card hover:shadow-card-hover transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Target (₹{activePlantTargetCr.toFixed(0)} Cr)
+                </span>
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2 truncate">
+                {achievementPct}%
+              </p>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                <span>Target: ₹{activePlantTargetCr.toFixed(2)} Cr</span>
+                <span className={varianceCr >= 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                  {varianceCr >= 0 ? '+' : ''}{varianceCr.toFixed(2)} Cr
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* KPI 3: Total Inv. Qty (Nos) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Inv Quantity</span>
-            <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Inv Quantity</span>
+            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
               <Boxes className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1.5 truncate">
-            {scopedKPIs.totalQty.toLocaleString()} Nos
+          <p className="text-2xl font-black text-slate-900 dark:text-white mt-2 truncate">
+            {scopedKPIs.totalQty.toLocaleString()}
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">Primary Quantity</p>
+          <p className="text-[11px] text-slate-400 mt-1">Units (Nos)</p>
         </div>
 
-        {/* KPI 3: Customer Count (DISTINCT Master Customer Group) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
+        {/* KPI 4: Customer Count (DISTINCT Master Customer Group) */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-card hover:shadow-card-hover transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Customer Count</span>
-            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Customer Count</span>
+            <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1.5 truncate">
+          <p className="text-2xl font-black text-slate-900 dark:text-white mt-2 truncate">
             {scopedKPIs.masterCustomerCount}
           </p>
-          <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-1 font-semibold truncate" title="DISTINCT Master Customer Groups">
+          <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1 font-semibold truncate" title="DISTINCT Master Customer Groups">
             Master Groups ({scopedKPIs.individualCustomerCount} Accounts)
           </p>
         </div>
-
-        {/* KPI 4: Product Count (Distinct SKUs) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Products</span>
-            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-              <Package className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1.5 truncate">
-            {scopedKPIs.productCount}
-          </p>
-          <p className="text-[10px] text-slate-400 mt-1">Active Material SKUs</p>
-        </div>
-
-        {/* KPI 5: Invoice Count (DISTINCT Invoice Num) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Invoices</span>
-            <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400">
-              <Receipt className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1.5 truncate">
-            {scopedKPIs.invoiceCount.toLocaleString()}
-          </p>
-          <p className="text-[10px] text-slate-400 mt-1">Distinct Invoices</p>
-        </div>
       </div>
 
-      {/* 7 & 8. PLANT-WISE SALES COMPARISON & DETAILED PERFORMANCE MATRIX */}
+      {/* PLANT TARGET COMPARISON BANNER (Dynamic: ₹120 Cr per plant / ₹480 Cr for all 4 plants) */}
+      {(() => {
+        const isSinglePlant = Boolean(activePlantFilter && activePlantFilter !== 'ALL' && activePlantFilter !== 'All Plants');
+        const plantScopeCount = isSinglePlant ? 1 : 4;
+        const activePlantTargetCr = plantScopeCount * 120.0;
+        const achievementPct = Number(((scopedKPIs.totalSales / activePlantTargetCr) * 100).toFixed(1));
+        const varianceCr = Number((scopedKPIs.totalSales - activePlantTargetCr).toFixed(2));
+        const plantScopeLabel = isSinglePlant ? `${activePlantFilter} Plant (Target: ₹120.00 Cr)` : 'All 4 Plants Combined (Target: 4 × ₹120 Cr = ₹480.00 Cr)';
+
+        return (
+          <div className="bg-gradient-to-r from-emerald-500/10 via-amber-500/10 to-brand-500/10 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl p-5 shadow-card space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <span>Plant Sales Performance vs Target ({plantScopeLabel})</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Target Reference: ₹{activePlantTargetCr.toFixed(2)} Cr | Current Achieved: ₹{scopedKPIs.totalSales.toFixed(2)} Cr | Variance: {varianceCr >= 0 ? '+' : ''}{varianceCr.toFixed(2)} Cr
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                  {achievementPct}% Achieved
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full bg-slate-200 dark:bg-slate-700 h-3.5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 via-emerald-500 to-brand-600 transition-all duration-700 rounded-full"
+                style={{ width: `${Math.min(100, achievementPct)}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 7 & 8. PLANT-WISE SALES COMPARISON & PERFORMANCE MATRIX */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Plant Comparison Chart (2 Cols) */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-card space-y-4">
@@ -576,14 +626,14 @@ export const PlantAnalysis: React.FC = () => {
         </div>
       </div>
 
-      {/* 8. DETAILED PLANT PERFORMANCE TABLE */}
+      {/* 8. DETAILED PLANT PERFORMANCE TABLE (Requirement 6: Products/Invoices/Action removed) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-card">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Building2 className="w-4 h-4 text-amber-500" />
             <span>Detailed Plant Performance Matrix</span>
           </h3>
-          <span className="text-xs text-slate-400">Master Customers = DISTINCT Master Customer Group</span>
+          <span className="text-xs text-slate-400">Target Benchmark: ₹120.00 Cr</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -594,11 +644,9 @@ export const PlantAnalysis: React.FC = () => {
                 <th className="py-3 px-4">Plant Code</th>
                 <th className="py-3 px-4 text-right">Sales Revenue (Cr)</th>
                 <th className="py-3 px-4 text-right">Contribution %</th>
+                <th className="py-3 px-4 text-right">% of ₹120 Cr Target</th>
                 <th className="py-3 px-4 text-right">Quantity (Nos)</th>
                 <th className="py-3 px-4 text-center">Master Customers</th>
-                <th className="py-3 px-4 text-center">Products (SKUs)</th>
-                <th className="py-3 px-4 text-center">Invoices</th>
-                <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -619,24 +667,14 @@ export const PlantAnalysis: React.FC = () => {
                   <td className="py-3.5 px-4 text-right font-bold text-amber-600 dark:text-amber-400">
                     {plant.contributionPct}%
                   </td>
-                  <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                  <td className="py-3.5 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                    {((plant.sales / 120) * 100).toFixed(1)}%
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-semibold text-slate-700 dark:text-slate-300">
                     {plant.quantity.toLocaleString()}
                   </td>
                   <td className="py-3.5 px-4 text-center font-bold text-purple-600 dark:text-purple-400">
                     {plant.masterCustomers}
-                  </td>
-                  <td className="py-3.5 px-4 text-center font-medium">{plant.products}</td>
-                  <td className="py-3.5 px-4 text-center font-medium">{plant.invoices}</td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        setFilter('plants', [plant.plantName]);
-                      }}
-                      className="px-3 py-1 text-[11px] font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-800 hover:bg-amber-100"
-                    >
-                      Filter Scope &rarr;
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -734,7 +772,6 @@ export const PlantAnalysis: React.FC = () => {
                 <th className="py-3 px-4 text-right">Plant Share %</th>
                 <th className="py-3 px-4 text-right">Quantity (Nos)</th>
                 <th className="py-3 px-4 text-center">Master Customers</th>
-                <th className="py-3 px-4 text-center">Invoices</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -748,7 +785,6 @@ export const PlantAnalysis: React.FC = () => {
                   <td className="py-3 px-4 text-right font-bold text-indigo-600 dark:text-indigo-400">{prod.contributionPct}%</td>
                   <td className="py-3 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">{prod.quantity.toLocaleString()}</td>
                   <td className="py-3 px-4 text-center font-bold text-purple-600 dark:text-purple-400">{prod.masterCustomerCount}</td>
-                  <td className="py-3 px-4 text-center font-medium">{prod.invoiceCount}</td>
                 </tr>
               ))}
             </tbody>
@@ -845,8 +881,6 @@ export const PlantAnalysis: React.FC = () => {
                 <th className="py-3 px-4 text-right">Sales Revenue (Cr)</th>
                 <th className="py-3 px-4 text-right">Contribution %</th>
                 <th className="py-3 px-4 text-right">Quantity (Nos)</th>
-                <th className="py-3 px-4 text-center">Products (SKUs)</th>
-                <th className="py-3 px-4 text-center">Invoices</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -872,8 +906,6 @@ export const PlantAnalysis: React.FC = () => {
                   <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                     {cust.quantity.toLocaleString()}
                   </td>
-                  <td className="py-3.5 px-4 text-center font-medium">{cust.productCount}</td>
-                  <td className="py-3.5 px-4 text-center font-medium">{cust.invoiceCount}</td>
                 </tr>
               ))}
             </tbody>
@@ -939,7 +971,7 @@ export const PlantAnalysis: React.FC = () => {
                           {fyRow.yoyGrowthPct >= 0 ? '+' : ''}{fyRow.yoyGrowthPct}%
                         </span>
                       ) : (
-                        <span className="text-slate-400 font-normal">Base Year</span>
+                        <span className="text-slate-500 dark:text-slate-400 font-normal text-[11px]">{fyRow.yoyGrowthStatus || 'Base Year'}</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-right font-semibold text-emerald-600">{fyRow.quantity.toLocaleString()}</td>

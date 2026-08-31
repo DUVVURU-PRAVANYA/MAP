@@ -56,6 +56,14 @@ const PRODUCTS_BY_SEGMENT: Record<string, { code: string; name: string; basePric
   ],
 };
 
+const APPLICATIONS_BY_SEGMENT: Record<string, string[]> = {
+  'Commercial Vehicles': ['Heavy Duty Trucks', 'Light Commercial Vehicles (LCV)', 'Intercity Bus Fleet', 'Tipper & Construction Trucks'],
+  'Passenger Vehicles': ['Sedan & Hatchback', 'Compact SUV', 'Premium SUV', 'Electric Vehicle (EV)'],
+  '2 Wheelers & 3 Wheelers': ['Commuter Motorcycles', 'Premium Sport Bikes', 'Electric Scooters (EV)', 'Passenger Auto Rickshaw', 'Cargo 3-Wheeler'],
+  'Tractors & Off-Highway': ['Agricultural Tractors', 'Mining & Earthmoving', 'Harvesters & Farm Equipment', 'Forklifts & Material Handling'],
+  'Industrial & Spares': ['Stationary Generators', 'Marine Propulsion', 'Industrial Compressors'],
+};
+
 export function generateSampleData(recordCount = 2500): SampleRecord[] {
   const records: SampleRecord[] = [];
   const segments = Object.keys(PRODUCTS_BY_SEGMENT);
@@ -69,6 +77,8 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
     const segment = segments[Math.floor(Math.random() * segments.length)];
     const products = PRODUCTS_BY_SEGMENT[segment];
     const product = products[Math.floor(Math.random() * products.length)];
+    const appList = APPLICATIONS_BY_SEGMENT[segment] || ['General Automotive'];
+    const application = appList[Math.floor(Math.random() * appList.length)];
     const plantCode = PLANT_CODES[Math.floor(Math.random() * PLANT_CODES.length)];
     const invoiceNum = `INV-${500100 + i}`;
 
@@ -99,6 +109,7 @@ export function generateSampleData(recordCount = 2500): SampleRecord[] {
       'Master Customer Group': cust.masterGroup,
       'Material code': product.code,
       'Description': product.name,
+      'Application': application,
       'Bill Date': billDate,
       'GRN date': billDate,
       'Inv. Qty': invQty,
