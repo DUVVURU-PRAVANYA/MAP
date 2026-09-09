@@ -1,0 +1,1276 @@
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
+import { processRawRecords } from '../../server/dataProcessor.js';
+import { generateBusinessInsights } from '../../server/insightsEngine.js';
+import { generateSampleData } from '../../scripts/generateSampleData.js';
+import {
+  ApplicationMetric,
+  BusinessInsight,
+  CleanSalesRecord,
+  CustomerMetric,
+  DataQualitySummary,
+  FilterState,
+  FinancialYearMetric,
+  KPIMetrics,
+  PlantMetric,
+  ProductMetric,
+  ProductFamilyMetric,
+  RawSalesRecord,
+  SegmentMetric,
+  TimeTrendPoint,
+  ViewTab,
+} from '../types/analytics';
+
+export interface BreadcrumbItem {
+  label: string;
+  type: 'all' | 'segment' | 'product' | 'customer' | 'quarter';
+  value?: string;
+}
+
+export function getReportingPeriodBounds(fy: string): { startDate: string; endDate: string; label: string; startYear: number; endYear: number } | null {
+  if (!fy || fy === 'ALL' || fy === 'All Years') return null;
+  const match = fy.match(/(\d{4})/);
+  if (!match) return null;
+  const startYear = parseInt(match[1], 10);
+  const endYear = startYear + 1;
+  const startDate = `${startYear}-04-01`;
+  const endDate = `${endYear}-03-31`;
+  const label = `01-Apr-${startYear} → 31-Mar-${endYear}`;
+  return { startDate, endDate, label, startYear, endYear };
+}
+
+export function getPrimaryReportingFY(records: CleanSalesRecord[]): string {
+  if (!records || records.length === 0) return '';
+  const fyMap: Record<string, number> = {};
+  records.forEach(r => {
+    if (r.financialYear) {
+      fyMap[r.financialYear] = (fyMap[r.financialYear] || 0) + 1;
+    }
+  });
+  const entries = Object.entries(fyMap);
+  if (entries.length === 0) return '';
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][0];
+}
+
+interface AnalyticsContextType {
+  activeView: ViewTab;
+  setActiveView: (view: ViewTab) => void;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+  processingStage: string;
+  filename: string;
+  qualitySummary: DataQualitySummary | null;
+  allRecords: CleanSalesRecord[];
+  filteredRecords: CleanSalesRecord[];
+  insights: BusinessInsight[];
+  filters: FilterState;
+  breadcrumbs: BreadcrumbItem[];
+
+  // Reporting Financial Year properties
+  selectedReportingFY: string;
+  setSelectedReportingFY: (fy: string) => void;
+  reportingPeriodLabel: string;
+  reportingBounds: { startDate: string; endDate: string; label: string; startYear: number; endYear: number } | null;
+  outsideReportingPeriodRecords: CleanSalesRecord[];
+  availableReportingFYs: string[];
+
+  // Financial Year properties
+  availableFinancialYears: string[];
+  financialYearBreakdown: FinancialYearMetric[];
+
+  // Selection state for detail drawers
+  selectedProduct: string | null;
+  setSelectedProduct: (product: string | null) => void;
+  selectedCustomer: string | null;
+  setSelectedCustomer: (customer: string | null) => void;
+  compareProducts: string[];
+  setCompareProducts: (products: string[] | ((prev: string[]) => string[])) => void;
+
+  // Actions
+  uploadExcelFile: (file: File) => Promise<void>;
+  loadSampleDataset: () => Promise<void>;
+  setFilter: (key: keyof FilterState, value: any) => void;
+  toggleFinancialYearFilter: (fy: string) => void;
+  toggleSegmentFilter: (segment: string) => void;
+  toggleProductFilter: (product: string) => void;
+  toggleCustomerFilter: (customer: string) => void;
+  togglePlantFilter: (plant: string) => void;
+  toggleInvoiceNumFilter: (inv: string) => void;
+  toggleCustomerGroupFilter: (cg: string) => void;
+  toggleMasterCustomerGroupFilter: (mcg: string) => void;
+  toggleRblProductSegmentFilter: (rblSeg: string) => void;
+  clearAllFilters: () => void;
+  investigateInsight: (insight: BusinessInsight) => void;
+  popBreadcrumb: (index: number) => void;
+  resetDataset: () => void;
+
+  // Theme
+  theme: 'light' | 'dark' | 'system';
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+
+  // Dynamic Cross-Filtering Options
+  availableSegments: string[];
+  availableRblProductSegments: string[];
+  availableProducts: string[];
+  availableCustomers: string[];
+  availableCustomerGroups: string[];
+  availableMasterCustomerGroups: string[];
+  availablePlants: string[];
+  availableInvoiceNums: string[];
+
+  // Derived Metrics
+  kpiMetrics: KPIMetrics;
+  timeTrends: TimeTrendPoint[];
+  segmentBreakdown: SegmentMetric[];
+  productFamilyBreakdown: ProductFamilyMetric[];
+  plantBreakdown: PlantMetric[];
+  topProducts: ProductMetric[];
+  topApplications: ApplicationMetric[];
+  topCustomers: CustomerMetric[];
+  quarterlyBreakdown: { quarter: string; sales: number; quantity: number; customers: number }[];
+}
+
+const initialFilters: FilterState = {
+  dateRange: null,
+  financialYears: [],
+  segments: [],
+  rblProductSegments: [],
+  products: [],
+  customers: [],
+  customerGroups: [],
+  masterCustomerGroups: [],
+  plants: [],
+  invoiceNums: [],
+  searchTerm: '',
+};
+
+const AnalyticsContext = createContext<AnalyticsContextType | undefined>(undefined);
+
+export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [activeView, setActiveView] = useState<ViewTab>('landing');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [processingStage, setProcessingStage] = useState<string>('');
+  const [filename, setFilename] = useState<string>('');
+  const [qualitySummary, setQualitySummary] = useState<DataQualitySummary | null>(null);
+  const [allRecords, setAllRecords] = useState<CleanSalesRecord[]>([]);
+  const [insights, setInsights] = useState<BusinessInsight[]>([]);
+  const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([{ label: 'All Sales', type: 'all' }]);
+
+  const [selectedReportingFY, setSelectedReportingFY] = useState<string>('');
+
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  const [compareProducts, setCompareProducts] = useState<string[]>([]);
+
+  // Theme handling
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('light');
+
+  const setTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    setThemeState(newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (newTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  };
+
+  useEffect(() => {
+    setTheme('light');
+  }, []);
+
+  // Reporting Bounds & Period Label
+  const reportingBounds = useMemo(() => {
+    return getReportingPeriodBounds(selectedReportingFY);
+  }, [selectedReportingFY]);
+
+  const reportingPeriodLabel = useMemo(() => {
+    if (!selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years') {
+      return 'All Available Financial Years';
+    }
+    return reportingBounds ? reportingBounds.label : '';
+  }, [reportingBounds, selectedReportingFY]);
+
+  const availableReportingFYs = useMemo(() => {
+    const fys = Array.from(new Set(allRecords.map(r => r.financialYear))).filter(Boolean).sort();
+    if (selectedReportingFY && selectedReportingFY !== 'ALL' && selectedReportingFY !== 'All Years' && !fys.includes(selectedReportingFY)) {
+      fys.push(selectedReportingFY);
+      fys.sort();
+    }
+    return fys;
+  }, [allRecords, selectedReportingFY]);
+
+  const outsideReportingPeriodRecords = useMemo(() => {
+    if (!selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years' || allRecords.length === 0) return [];
+    return allRecords.filter(r => r.financialYear !== selectedReportingFY);
+  }, [allRecords, selectedReportingFY]);
+
+  // Upload Excel File handler
+  const uploadExcelFile = async (file: File) => {
+    setIsLoading(true);
+    setActiveView('processing');
+    setProcessingStage('Uploading Excel workbook...');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      await new Promise(r => setTimeout(r, 600));
+      setProcessingStage('Reading sheets & checking column definitions...');
+
+      await new Promise(r => setTimeout(r, 600));
+      setProcessingStage('Validating numeric values and date formats...');
+
+      await new Promise(r => setTimeout(r, 600));
+      setProcessingStage('Validating data quality and missing attributes...');
+
+      let data: any = null;
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          data = await response.json();
+        } else if (contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload Excel file');
+        } else {
+          console.warn(`[UPLOAD DIAGNOSTIC] Backend returned status ${response.status} with non-JSON content-type: ${contentType}`);
+        }
+      } catch (netErr: any) {
+        console.warn('[UPLOAD DIAGNOSTIC] Endpoint upload request error:', netErr?.message || netErr);
+      }
+
+      // Safe client-side fallback: if backend is unavailable or returns HTML/non-JSON, parse directly in browser
+      if (!data || !data.cleanRecords || data.cleanRecords.length === 0) {
+        setProcessingStage('Parsing Excel workbook in-browser...');
+        await new Promise(r => setTimeout(r, 300));
+
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, raw: true });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData: RawSalesRecord[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: true });
+
+        const result = processRawRecords(rawData, file.name);
+        const insights = generateBusinessInsights(result.cleanRecords);
+
+        data = {
+          success: true,
+          filename: result.filename,
+          qualitySummary: result.qualitySummary,
+          cleanRecords: result.cleanRecords,
+          insights,
+        };
+      }
+
+      setProcessingStage('Generating interactive dashboard & business insights...');
+      await new Promise(r => setTimeout(r, 400));
+
+      const recs: CleanSalesRecord[] = data.cleanRecords || [];
+      setFilename(data.filename);
+      setAllRecords(data.cleanRecords);
+      setQualitySummary(data.qualitySummary);
+      setInsights(data.insights);
+
+      const primaryFY = getPrimaryReportingFY(data.cleanRecords);
+      setSelectedReportingFY(primaryFY || 'FY 2025-26');
+      clearAllFilters(data.cleanRecords);
+
+      setIsLoading(false);
+      setActiveView('quality_summary');
+    } catch (err: any) {
+      setIsLoading(false);
+      setActiveView('landing');
+      alert(`Error uploading file: ${err.message || String(err)}`);
+    }
+  };
+
+  // Load Sample Dataset handler
+  const loadSampleDataset = async () => {
+    setIsLoading(true);
+    setActiveView('processing');
+    setProcessingStage('Loading synthetic sales dataset (sample_sales_dashboard_data.xlsx)...');
+
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setProcessingStage('Checking 2,500 sales transactions...');
+
+      await new Promise(r => setTimeout(r, 500));
+      setProcessingStage('Parsing segments, products, and customers...');
+
+      let data: any = null;
+      try {
+        const response = await fetch('/api/sample');
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          data = await response.json();
+        }
+      } catch (netErr) {
+        console.warn('[SAMPLE DIAGNOSTIC] Network fetch failed, generating client sample dataset:', netErr);
+      }
+
+      if (!data || !data.cleanRecords) {
+        const rawRecords = generateSampleData(2500);
+        const result = processRawRecords(rawRecords, 'sample_sales_dashboard_data.xlsx');
+        const insights = generateBusinessInsights(result.cleanRecords);
+        data = {
+          success: true,
+          filename: 'sample_sales_dashboard_data.xlsx',
+          qualitySummary: result.qualitySummary,
+          cleanRecords: result.cleanRecords,
+          insights,
+        };
+      }
+
+      setProcessingStage('Preparing visual analytics dashboard...');
+      await new Promise(r => setTimeout(r, 500));
+
+      setFilename(data.filename);
+      setAllRecords(data.cleanRecords);
+      setQualitySummary(data.qualitySummary);
+      setInsights(data.insights);
+
+      const primaryFY = getPrimaryReportingFY(data.cleanRecords);
+      setSelectedReportingFY(primaryFY || 'FY 2025-26');
+      clearAllFilters(data.cleanRecords);
+
+      setIsLoading(false);
+      setActiveView('quality_summary');
+    } catch (err: any) {
+      setIsLoading(false);
+      setActiveView('landing');
+      alert(`Error loading sample dataset: ${err.message || String(err)}`);
+    }
+  };
+
+  const resetDataset = () => {
+    setAllRecords([]);
+    setQualitySummary(null);
+    setFilename('');
+    setInsights([]);
+    setSelectedReportingFY('');
+    clearAllFilters([]);
+    setActiveView('landing');
+  };
+
+  // Available Financial Years
+  const availableFinancialYears = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.financialYear))).filter(Boolean).sort();
+  }, [allRecords]);
+
+  // Filter handlers
+  const setFilter = (key: keyof FilterState, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleFinancialYearFilter = (fy: string) => {
+    setFilters(prev => {
+      const isOnlySelected = prev.financialYears.length === 1 && prev.financialYears[0] === fy;
+      return { ...prev, financialYears: isOnlySelected ? [] : [fy] };
+    });
+  };
+
+  const toggleSegmentFilter = (seg: string) => {
+    setFilters(prev => {
+      const exists = prev.segments.includes(seg);
+      const nextSegments = exists ? prev.segments.filter(s => s !== seg) : [...prev.segments, seg];
+      updateBreadcrumbs(nextSegments, prev.products, prev.customers);
+      return { ...prev, segments: nextSegments };
+    });
+  };
+
+  const toggleProductFilter = (prod: string) => {
+    setFilters(prev => {
+      const exists = prev.products.includes(prod);
+      const nextProducts = exists ? prev.products.filter(p => p !== prod) : [...prev.products, prod];
+      updateBreadcrumbs(prev.segments, nextProducts, prev.customers);
+      return { ...prev, products: nextProducts };
+    });
+  };
+
+  const toggleCustomerFilter = (cust: string) => {
+    setFilters(prev => {
+      const exists = prev.customers.includes(cust);
+      const nextCustomers = exists ? prev.customers.filter(c => c !== cust) : [...prev.customers, cust];
+      updateBreadcrumbs(prev.segments, prev.products, nextCustomers);
+      return { ...prev, customers: nextCustomers };
+    });
+  };
+
+  const togglePlantFilter = (plant: string) => {
+    setFilters(prev => {
+      const exists = prev.plants.includes(plant);
+      const nextPlants = exists ? prev.plants.filter(p => p !== plant) : [...prev.plants, plant];
+      return { ...prev, plants: nextPlants };
+    });
+  };
+
+  const toggleInvoiceNumFilter = (inv: string) => {
+    setFilters(prev => {
+      const exists = prev.invoiceNums.includes(inv);
+      const nextInvoiceNums = exists ? prev.invoiceNums.filter(i => i !== inv) : [...prev.invoiceNums, inv];
+      return { ...prev, invoiceNums: nextInvoiceNums };
+    });
+  };
+
+  const toggleCustomerGroupFilter = (cg: string) => {
+    setFilters(prev => {
+      const exists = prev.customerGroups.includes(cg);
+      const nextCGs = exists ? prev.customerGroups.filter(c => c !== cg) : [...prev.customerGroups, cg];
+      return { ...prev, customerGroups: nextCGs };
+    });
+  };
+
+  const toggleMasterCustomerGroupFilter = (mcg: string) => {
+    setFilters(prev => {
+      const exists = prev.masterCustomerGroups.includes(mcg);
+      const nextMCGs = exists ? prev.masterCustomerGroups.filter(m => m !== mcg) : [...prev.masterCustomerGroups, mcg];
+      return { ...prev, masterCustomerGroups: nextMCGs };
+    });
+  };
+
+  const toggleRblProductSegmentFilter = (rblSeg: string) => {
+    setFilters(prev => {
+      const exists = prev.rblProductSegments.includes(rblSeg);
+      const nextRbl = exists ? prev.rblProductSegments.filter(s => s !== rblSeg) : [...prev.rblProductSegments, rblSeg];
+      return { ...prev, rblProductSegments: nextRbl };
+    });
+  };
+
+  const clearAllFilters = (recordsOverride?: CleanSalesRecord[]) => {
+    setFilters({
+      dateRange: null,
+      financialYears: [],
+      segments: [],
+      rblProductSegments: [],
+      products: [],
+      customers: [],
+      customerGroups: [],
+      masterCustomerGroups: [],
+      plants: [],
+      invoiceNums: [],
+      searchTerm: '',
+    });
+    setBreadcrumbs([{ label: 'All Sales', type: 'all' }]);
+  };
+
+  const updateBreadcrumbs = (segments: string[], products: string[], customers: string[]) => {
+    const crumbs: BreadcrumbItem[] = [{ label: 'All Sales', type: 'all' }];
+    if (segments.length > 0) {
+      crumbs.push({ label: segments.length === 1 ? segments[0] : `${segments.length} Segments`, type: 'segment', value: segments[0] });
+    }
+    if (products.length > 0) {
+      crumbs.push({ label: products.length === 1 ? products[0] : `${products.length} Products`, type: 'product', value: products[0] });
+    }
+    if (customers.length > 0) {
+      crumbs.push({ label: customers.length === 1 ? customers[0] : `${customers.length} Customers`, type: 'customer', value: customers[0] });
+    }
+    setBreadcrumbs(crumbs);
+  };
+
+  const popBreadcrumb = (index: number) => {
+    if (index === 0) {
+      clearAllFilters();
+      return;
+    }
+    const targetCrumb = breadcrumbs[index];
+    if (targetCrumb.type === 'segment') {
+      setFilters(prev => ({ ...prev, products: [], customers: [] }));
+      setBreadcrumbs(prev => prev.slice(0, index + 1));
+    } else if (targetCrumb.type === 'product') {
+      setFilters(prev => ({ ...prev, customers: [] }));
+      setBreadcrumbs(prev => prev.slice(0, index + 1));
+    }
+  };
+
+  const investigateInsight = (insight: BusinessInsight) => {
+    clearAllFilters();
+    const ctx = insight.affectedContext;
+    if (ctx.segment) {
+      toggleSegmentFilter(ctx.segment);
+    }
+    if (ctx.product) {
+      toggleProductFilter(ctx.product);
+    }
+    if (ctx.customer) {
+      toggleCustomerFilter(ctx.customer);
+    }
+    if (ctx.plant) {
+      togglePlantFilter(ctx.plant);
+    }
+    setActiveView('overview');
+  };
+
+  // Compute Filtered Records strictly scoped to Selected Financial Year & Active Filters
+  const filteredRecords = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return allRecords.filter(r => {
+      if (!isAll && r.financialYear !== selectedReportingFY) {
+        return false;
+      }
+      if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) {
+        return false;
+      }
+      if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) {
+        return false;
+      }
+      if (filters.rblProductSegments.length > 0 && (!r.rblProductSegment || !filters.rblProductSegments.includes(r.rblProductSegment))) {
+        return false;
+      }
+      if (filters.plants.length > 0 && !filters.plants.includes(r.plantCode) && !filters.plants.includes(r.plantName)) {
+        return false;
+      }
+      if (filters.invoiceNums.length > 0 && !filters.invoiceNums.includes(r.invoiceNum)) {
+        return false;
+      }
+      if (filters.customerGroups.length > 0 && !filters.customerGroups.includes(r.customerGroup)) {
+        return false;
+      }
+      if (filters.masterCustomerGroups.length > 0 && !filters.masterCustomerGroups.includes(r.masterCustomerGroup)) {
+        return false;
+      }
+      if (filters.products.length > 0) {
+        const prodName = `${r.materialCode} - ${r.description}`;
+        const isMatch =
+          filters.products.includes(r.description) ||
+          filters.products.includes(r.materialCode) ||
+          filters.products.includes(prodName);
+        if (!isMatch) {
+          return false;
+        }
+      }
+      if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) {
+        return false;
+      }
+      if (filters.searchTerm) {
+        const q = filters.searchTerm.toLowerCase();
+        const matches =
+          r.customer.toLowerCase().includes(q) ||
+          r.customerGroup.toLowerCase().includes(q) ||
+          r.masterCustomerGroup.toLowerCase().includes(q) ||
+          r.description.toLowerCase().includes(q) ||
+          r.materialCode.toLowerCase().includes(q) ||
+          r.productSegment.toLowerCase().includes(q) ||
+          (r.rblProductSegment && r.rblProductSegment.toLowerCase().includes(q)) ||
+          r.plantName.toLowerCase().includes(q) ||
+          r.invoiceNum.toLowerCase().includes(q) ||
+          (r.financialYear && r.financialYear.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Vehicle Segments available given other active filters
+  const availableSegments = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.products.length > 0) {
+              const prodName = `${r.materialCode} - ${r.description}`;
+              const isMatch =
+                filters.products.includes(r.description) ||
+                filters.products.includes(r.materialCode) ||
+                filters.products.includes(prodName);
+              if (!isMatch) return false;
+            }
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+            if (filters.searchTerm) {
+              const q = filters.searchTerm.toLowerCase();
+              const matches =
+                r.customer.toLowerCase().includes(q) ||
+                r.description.toLowerCase().includes(q) ||
+                r.materialCode.toLowerCase().includes(q) ||
+                r.productSegment.toLowerCase().includes(q);
+              if (!matches) return false;
+            }
+            return true;
+          })
+          .map(r => r.productSegment)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters.financialYears, filters.products, filters.customers, filters.searchTerm]);
+
+  // Dynamic Cross-Filtering Options: RBL Product Segments available given active Segment and other filters
+  const availableRblProductSegments = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+            return true;
+          })
+          .map(r => r.rblProductSegment)
+          .filter((s): s is string => Boolean(s))
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Product Families / Products available given active Segment & RBL Segment filters
+  const availableProducts = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+            if (filters.rblProductSegments.length > 0 && (!r.rblProductSegment || !filters.rblProductSegments.includes(r.rblProductSegment))) return false;
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+            if (filters.searchTerm) {
+              const q = filters.searchTerm.toLowerCase();
+              const matches =
+                r.customer.toLowerCase().includes(q) ||
+                r.description.toLowerCase().includes(q) ||
+                r.materialCode.toLowerCase().includes(q) ||
+                r.productSegment.toLowerCase().includes(q);
+              if (!matches) return false;
+            }
+            return true;
+          })
+          .map(r => r.description)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Plants available given active filters
+  const availablePlants = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.financialYears.length > 0 && !filters.financialYears.includes(r.financialYear)) return false;
+            if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+            if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+            return true;
+          })
+          .map(r => r.plantName)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Invoice Nums available given active filters
+  const availableInvoiceNums = useMemo(() => {
+    const isAll = !selectedReportingFY || selectedReportingFY === 'ALL' || selectedReportingFY === 'All Years';
+    return Array.from(
+      new Set(
+        allRecords
+          .filter(r => {
+            if (!isAll && r.financialYear !== selectedReportingFY) return false;
+            if (filters.plants.length > 0 && !filters.plants.includes(r.plantCode) && !filters.plants.includes(r.plantName)) return false;
+            return true;
+          })
+          .map(r => r.invoiceNum)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [allRecords, selectedReportingFY, filters]);
+
+  // Dynamic Cross-Filtering Options: Customer Groups available
+  const availableCustomerGroups = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.customerGroup).filter(Boolean))).sort();
+  }, [allRecords]);
+
+  // Dynamic Cross-Filtering Options: Master Customer Groups available
+  const availableMasterCustomerGroups = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.masterCustomerGroup).filter(Boolean))).sort();
+  }, [allRecords]);
+
+  // Dynamic Cross-Filtering Options: Individual Customers available
+  const availableCustomers = useMemo(() => {
+    return Array.from(new Set(allRecords.map(r => r.customer).filter(Boolean))).sort();
+  }, [allRecords]);
+
+  // Derived Plant Breakdown
+  const plantBreakdown = useMemo<PlantMetric[]>(() => {
+    const total = filteredRecords.reduce((sum, r) => sum + r.saleValue, 0) || 1;
+    const plantMap: Record<string, { plantCode: string; plantName: string; sales: number; quantity: number; customers: Set<string>; products: Set<string>; transactions: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const code = r.plantCode || '3000';
+      if (!plantMap[code]) {
+        plantMap[code] = { plantCode: code, plantName: r.plantName || 'Chennai', sales: 0, quantity: 0, customers: new Set(), products: new Set(), transactions: 0 };
+      }
+      plantMap[code].sales += r.saleValue;
+      plantMap[code].quantity += r.saleQty;
+      plantMap[code].customers.add(r.masterCustomerGroup || r.customer);
+      plantMap[code].products.add(`${r.materialCode}|||${r.description}`);
+      plantMap[code].transactions += 1;
+    });
+
+    return Object.values(plantMap)
+      .map(data => ({
+        plantCode: data.plantCode,
+        plantName: data.plantName,
+        sales: data.sales,
+        quantity: data.quantity,
+        customerCount: data.customers.size,
+        productCount: data.products.size,
+        transactionCount: data.transactions,
+        percentage: Number(((data.sales / (total || 1)) * 100).toFixed(1)),
+        rank: 0,
+      }))
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }, [filteredRecords]);
+
+  // Derived KPI Metrics
+  const kpiMetrics = useMemo<KPIMetrics>(() => {
+    if (filteredRecords.length === 0) {
+      return {
+        totalSalesValue: 0,
+        totalInvQty: 0,
+        totalSaleQty: 0,
+        customerCount: 0,
+        individualCustomerCount: 0,
+        customerGroupCount: 0,
+        masterCustomerGroupCount: 0,
+        productCount: 0,
+        segmentCount: 0,
+        plantCount: 0,
+        invoiceCount: 0,
+        transactionCount: 0,
+        avgSalesValue: 0,
+      };
+    }
+
+    const totalSalesValue = filteredRecords.reduce((sum, r) => sum + r.saleValue, 0);
+    const totalSaleQty = filteredRecords.reduce((sum, r) => sum + r.saleQty, 0);
+
+    // CRITICAL REQUIREMENT: Main Customer Count MUST use DISTINCT Master Customer Group
+    const masterCustomerGroupCount = new Set(filteredRecords.map(r => r.masterCustomerGroup)).size;
+    const customerGroupCount = new Set(filteredRecords.map(r => r.customerGroup)).size;
+    const individualCustomerCount = new Set(filteredRecords.map(r => r.customer)).size;
+    const customerCount = masterCustomerGroupCount;
+
+    const productCount = new Set(filteredRecords.map(r => `${r.materialCode}|||${r.description}`)).size;
+    const segmentCount = new Set(filteredRecords.map(r => r.productSegment)).size;
+    const plantCount = new Set(filteredRecords.map(r => r.plantCode)).size;
+    const invoiceCount = new Set(filteredRecords.map(r => r.invoiceNum)).size;
+    const transactionCount = filteredRecords.length;
+    const avgSalesValue = transactionCount > 0 ? Number((totalSalesValue / transactionCount).toFixed(3)) : 0;
+
+    // Dynamic calculation of YoY for KPI cards based strictly on previous FY with same filters
+    let prevPeriodDiffSalesValue: number | null = null;
+    let prevPeriodDiffQty: number | null = null;
+
+    if (selectedReportingFY && selectedReportingFY !== 'ALL' && selectedReportingFY !== 'All Years') {
+      const allFYs = Array.from(new Set(allRecords.map(r => r.financialYear).filter(Boolean))).sort();
+      const currentIdx = allFYs.indexOf(selectedReportingFY);
+      if (currentIdx > 0) {
+        const prevFY = allFYs[currentIdx - 1];
+        const prevFYRecs = allRecords.filter(r => {
+          if (r.financialYear !== prevFY) return false;
+          if (filters.plants.length > 0 && !filters.plants.includes(r.plantName) && !filters.plants.includes(r.plantCode)) return false;
+          if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+          if (filters.rblProductSegments && filters.rblProductSegments.length > 0 && (!r.rblProductSegment || !filters.rblProductSegments.includes(r.rblProductSegment))) return false;
+          if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+          if (filters.masterCustomerGroups.length > 0 && !filters.masterCustomerGroups.includes(r.masterCustomerGroup)) return false;
+          if (filters.products.length > 0) {
+            const prodName = `${r.materialCode} - ${r.description}`;
+            const isMatch =
+              filters.products.includes(r.description) ||
+              filters.products.includes(r.materialCode) ||
+              filters.products.includes(prodName);
+            if (!isMatch) return false;
+          }
+          if (filters.searchTerm) {
+            const q = filters.searchTerm.toLowerCase();
+            const matches =
+              (r.customer && r.customer.toLowerCase().includes(q)) ||
+              (r.description && r.description.toLowerCase().includes(q)) ||
+              (r.materialCode && r.materialCode.toLowerCase().includes(q)) ||
+              (r.productSegment && r.productSegment.toLowerCase().includes(q)) ||
+              (r.application && r.application.toLowerCase().includes(q));
+            if (!matches) return false;
+          }
+          return true;
+        });
+
+        const prevSales = prevFYRecs.reduce((sum, r) => sum + r.saleValue, 0);
+        const prevQty = prevFYRecs.reduce((sum, r) => sum + r.saleQty, 0);
+        if (prevSales > 0) {
+          prevPeriodDiffSalesValue = Number((((totalSalesValue - prevSales) / prevSales) * 100).toFixed(1));
+        }
+        if (prevQty > 0) {
+          prevPeriodDiffQty = Number((((totalSaleQty - prevQty) / prevQty) * 100).toFixed(1));
+        }
+      }
+    }
+
+    return {
+      totalSalesValue,
+      totalInvQty: totalSaleQty,
+      totalSaleQty,
+      customerCount,
+      individualCustomerCount,
+      customerGroupCount,
+      masterCustomerGroupCount,
+      productCount,
+      segmentCount,
+      plantCount,
+      invoiceCount,
+      transactionCount,
+      avgSalesValue,
+      prevPeriodDiffSalesValue,
+      prevPeriodDiffQty,
+    };
+  }, [filteredRecords, allRecords, selectedReportingFY, filters]);
+
+  // Derived Time Trends (grouped by Month, sorted chronologically April -> March)
+  const timeTrends = useMemo<TimeTrendPoint[]>(() => {
+    const monthMap: Record<string, { period: string; sales: number; quantity: number; transactions: number; customers: Set<string>; monthSortKey: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const key = r.month;
+      if (!key) return;
+      if (!monthMap[key]) {
+        let sortKey = r.monthSortKey || 0;
+        monthMap[key] = { period: r.month, sales: 0, quantity: 0, transactions: 0, customers: new Set(), monthSortKey: sortKey };
+      }
+      monthMap[key].sales += r.saleValue;
+      monthMap[key].quantity += r.saleQty;
+      monthMap[key].transactions += 1;
+      monthMap[key].customers.add(r.customer);
+    });
+
+    return Object.values(monthMap)
+      .sort((a, b) => a.monthSortKey - b.monthSortKey)
+      .map(data => ({
+        period: data.period,
+        sales: data.sales,
+        quantity: data.quantity,
+        transactions: data.transactions,
+        customers: data.customers.size,
+        monthSortKey: data.monthSortKey,
+      }));
+  }, [filteredRecords]);
+
+  // Derived Segment Breakdown
+  const segmentBreakdown = useMemo<SegmentMetric[]>(() => {
+    const total = kpiMetrics.totalSalesValue || 1;
+    const segMap: Record<string, { sales: number; quantity: number; products: Set<string>; customers: Set<string>; transactions: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const seg = r.productSegment;
+      if (!seg) return;
+      if (!segMap[seg]) {
+        segMap[seg] = { sales: 0, quantity: 0, products: new Set(), customers: new Set(), transactions: 0 };
+      }
+      segMap[seg].sales += r.saleValue;
+      segMap[seg].quantity += r.saleQty;
+      segMap[seg].products.add(`${r.materialCode}|||${r.description}`);
+      segMap[seg].customers.add(r.customer);
+      segMap[seg].transactions += 1;
+    });
+
+    return Object.entries(segMap)
+      .map(([segment, data]) => ({
+        segment,
+        sales: data.sales,
+        quantity: data.quantity,
+        productCount: data.products.size,
+        customerCount: data.customers.size,
+        transactionCount: data.transactions,
+        percentage: Number(((data.sales / total) * 100).toFixed(1)),
+        rank: 0,
+      }))
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }, [filteredRecords, kpiMetrics.totalSalesValue]);
+
+  // Derived Product Family Breakdown
+  const productFamilyBreakdown = useMemo<ProductFamilyMetric[]>(() => {
+    const total = kpiMetrics.totalSalesValue || 1;
+    const pfMap: Record<string, { sales: number; quantity: number; skus: Set<string>; customers: Set<string>; transactions: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const pf = r.description;
+      if (!pf) return;
+      if (!pfMap[pf]) {
+        pfMap[pf] = { sales: 0, quantity: 0, skus: new Set(), customers: new Set(), transactions: 0 };
+      }
+      pfMap[pf].sales += r.saleValue;
+      pfMap[pf].quantity += r.saleQty;
+      pfMap[pf].skus.add(`${r.materialCode}|||${r.description}`);
+      pfMap[pf].customers.add(r.customer);
+      pfMap[pf].transactions += 1;
+    });
+
+    return Object.entries(pfMap)
+      .map(([productFamily, data]) => ({
+        productFamily,
+        sales: data.sales,
+        quantity: data.quantity,
+        skuCount: data.skus.size,
+        customerCount: data.customers.size,
+        transactionCount: data.transactions,
+        percentage: Number(((data.sales / total) * 100).toFixed(1)),
+        rank: 0,
+      }))
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }, [filteredRecords, kpiMetrics.totalSalesValue]);
+
+  // Derived Top Products (Keyed by Material Code + Description)
+  const topProducts = useMemo<ProductMetric[]>(() => {
+    const totalSales = kpiMetrics.totalSalesValue || 1;
+    const prodMap: Record<string, { materialCode: string; description: string; segment: string; sales: number; quantity: number; transactions: number; customers: Set<string> }> = {};
+
+    filteredRecords.forEach(r => {
+      const key = `${r.materialCode}|||${r.description}`;
+      if (!prodMap[key]) {
+        prodMap[key] = {
+          materialCode: r.materialCode,
+          description: r.description,
+          segment: r.productSegment,
+          sales: 0,
+          quantity: 0,
+          transactions: 0,
+          customers: new Set(),
+        };
+      }
+      prodMap[key].sales += r.saleValue;
+      prodMap[key].quantity += r.saleQty;
+      prodMap[key].transactions += 1;
+      prodMap[key].customers.add(r.customer);
+    });
+
+    return Object.values(prodMap)
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({
+        product: `${item.materialCode} - ${item.description}`,
+        materialCode: item.materialCode,
+        description: item.description,
+        segment: item.segment,
+        sales: item.sales,
+        quantity: item.quantity,
+        transactionCount: item.transactions,
+        customerCount: item.customers.size,
+        salesContributionPct: Number(((item.sales / totalSales) * 100).toFixed(1)),
+        rank: idx + 1,
+      }));
+  }, [filteredRecords, kpiMetrics.totalSalesValue]);
+
+  // Derived Top Applications by Sales (Strictly Application column per Requirement 3 & Master Prompt)
+  const topApplications = useMemo<ApplicationMetric[]>(() => {
+    const totalSales = kpiMetrics.totalSalesValue || 1;
+    const appMap: Record<string, { application: string; sales: number; quantity: number; transactions: number }> = {};
+
+    filteredRecords.forEach(r => {
+      const app = r.application ? r.application.trim() : '';
+      if (!app) return; // Strictly only actual non-blank values from the Application column
+      if (!appMap[app]) {
+        appMap[app] = { application: app, sales: 0, quantity: 0, transactions: 0 };
+      }
+      appMap[app].sales += r.saleValue;
+      appMap[app].quantity += r.saleQty;
+      appMap[app].transactions += 1;
+    });
+
+    const entries = Object.values(appMap);
+    if (entries.length === 0) return [];
+
+    return entries
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 10)
+      .map((item, idx) => ({
+        application: item.application,
+        sales: item.sales,
+        quantity: item.quantity,
+        transactionCount: item.transactions,
+        salesContributionPct: Number(((item.sales / totalSales) * 100).toFixed(1)),
+        rank: idx + 1,
+      }));
+  }, [filteredRecords, kpiMetrics.totalSalesValue]);
+
+  // Derived Top Key Account Customers (Aggregated at Master Customer Group level per Requirement 5)
+  const topCustomers = useMemo<CustomerMetric[]>(() => {
+    const custMap: Record<
+      string,
+      {
+        custNum: string;
+        customer: string;
+        masterCustomerGroup: string;
+        customerGroup: string;
+        sales: number;
+        quantity: number;
+        transactions: number;
+        products: Set<string>;
+        segments: Set<string>;
+      }
+    > = {};
+
+    filteredRecords.forEach(r => {
+      // Group at Master Customer Group level
+      const key = r.masterCustomerGroup || r.customerGroup || r.customer;
+      if (!key) return;
+      if (!custMap[key]) {
+        custMap[key] = {
+          custNum: r.custNum || '',
+          customer: key,
+          masterCustomerGroup: r.masterCustomerGroup || key,
+          customerGroup: r.customerGroup || key,
+          sales: 0,
+          quantity: 0,
+          transactions: 0,
+          products: new Set(),
+          segments: new Set(),
+        };
+      }
+      custMap[key].sales += r.saleValue;
+      custMap[key].quantity += r.saleQty;
+      custMap[key].transactions += 1;
+      custMap[key].products.add(`${r.materialCode}|||${r.description}`);
+      custMap[key].segments.add(r.productSegment);
+    });
+
+    return Object.values(custMap)
+      .sort((a, b) => b.sales - a.sales)
+      .map((item, idx) => ({
+        custNum: item.custNum,
+        customer: item.customer,
+        masterCustomerGroup: item.masterCustomerGroup,
+        customerGroup: item.customerGroup,
+        sales: item.sales,
+        quantity: item.quantity,
+        transactionCount: item.transactions,
+        productCount: item.products.size,
+        segmentCount: item.segments.size,
+        rank: idx + 1,
+      }));
+  }, [filteredRecords]);
+
+  // Derived Quarterly Breakdown (Q1 April-June, Q2 July-Sept, Q3 Oct-Dec, Q4 Jan-Mar)
+  const quarterlyBreakdown = useMemo(() => {
+    const qMap: Record<string, { sales: number; quantity: number; customers: Set<string> }> = {};
+
+    filteredRecords.forEach(r => {
+      if (!r.quarter) return;
+      if (!qMap[r.quarter]) {
+        qMap[r.quarter] = { sales: 0, quantity: 0, customers: new Set() };
+      }
+      qMap[r.quarter].sales += r.saleValue;
+      qMap[r.quarter].quantity += r.saleQty;
+      qMap[r.quarter].customers.add(r.customer);
+    });
+
+    const quarterOrder = ['Q1', 'Q2', 'Q3', 'Q4'];
+    return Object.entries(qMap)
+      .map(([quarter, data]) => ({
+        quarter,
+        sales: data.sales,
+        quantity: data.quantity,
+        customers: data.customers.size,
+      }))
+      .sort((a, b) => {
+        const idxA = quarterOrder.findIndex(q => a.quarter.startsWith(q));
+        const idxB = quarterOrder.findIndex(q => b.quarter.startsWith(q));
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        return a.quarter.localeCompare(b.quarter);
+      });
+  }, [filteredRecords]);
+
+  // Derived Multi-Financial Year Trend & YoY Growth (Scoped to active non-FY filters)
+  const financialYearBreakdown = useMemo<FinancialYearMetric[]>(() => {
+    const fyMap: Record<
+      string,
+      {
+        financialYear: string;
+        sales: number;
+        quantity: number;
+        customers: Set<string>;
+        products: Set<string>;
+        segments: Set<string>;
+        transactions: number;
+      }
+    > = {};
+
+    // Apply active non-FY filters to all records so multi-year comparison respects plant, customer, etc.
+    const multiYearFilteredRecords = allRecords.filter(r => {
+      if (filters.plants.length > 0 && !filters.plants.includes(r.plantName) && !filters.plants.includes(r.plantCode)) return false;
+      if (filters.segments.length > 0 && !filters.segments.includes(r.productSegment)) return false;
+      if (filters.rblProductSegments && filters.rblProductSegments.length > 0 && (!r.rblProductSegment || !filters.rblProductSegments.includes(r.rblProductSegment))) return false;
+      if (filters.customers.length > 0 && !filters.customers.includes(r.customer) && !filters.customers.includes(r.custNum)) return false;
+      if (filters.customerGroups.length > 0 && !filters.customerGroups.includes(r.customerGroup)) return false;
+      if (filters.masterCustomerGroups.length > 0 && !filters.masterCustomerGroups.includes(r.masterCustomerGroup)) return false;
+      if (filters.products.length > 0) {
+        const prodName = `${r.materialCode} - ${r.description}`;
+        const isMatch =
+          filters.products.includes(r.description) ||
+          filters.products.includes(r.materialCode) ||
+          filters.products.includes(prodName);
+        if (!isMatch) return false;
+      }
+      if (filters.invoiceNums.length > 0 && !filters.invoiceNums.includes(r.invoiceNum)) return false;
+      if (filters.searchTerm) {
+        const q = filters.searchTerm.toLowerCase();
+        const matches =
+          (r.customer && r.customer.toLowerCase().includes(q)) ||
+          (r.description && r.description.toLowerCase().includes(q)) ||
+          (r.materialCode && r.materialCode.toLowerCase().includes(q)) ||
+          (r.productSegment && r.productSegment.toLowerCase().includes(q)) ||
+          (r.application && r.application.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+
+    multiYearFilteredRecords.forEach(r => {
+      const fy = r.financialYear;
+      if (!fy || fy === 'FY Unknown') return;
+      if (!fyMap[fy]) {
+        fyMap[fy] = {
+          financialYear: fy,
+          sales: 0,
+          quantity: 0,
+          customers: new Set(),
+          products: new Set(),
+          segments: new Set(),
+          transactions: 0,
+        };
+      }
+      fyMap[fy].sales += r.saleValue;
+      fyMap[fy].quantity += r.saleQty;
+      fyMap[fy].customers.add(r.masterCustomerGroup || r.customer);
+      fyMap[fy].products.add(`${r.materialCode}|||${r.description}`);
+      fyMap[fy].segments.add(r.productSegment);
+      fyMap[fy].transactions += 1;
+    });
+
+    const sortedFYs = Object.keys(fyMap).sort();
+    return sortedFYs.map((fy, idx) => {
+      const data = fyMap[fy];
+      const prevData = idx > 0 ? fyMap[sortedFYs[idx - 1]] : undefined;
+      const prevSales = prevData ? prevData.sales : undefined;
+      let yoyGrowthPct: number | null = null;
+      let yoyGrowthStatus = 'N/A — No Prior FY in Dataset';
+
+      if (prevSales !== undefined) {
+        if (prevSales <= 0) {
+          yoyGrowthStatus = 'N/A — No Previous-Year Sales';
+        } else {
+          yoyGrowthPct = Number((((data.sales - prevSales) / prevSales) * 100).toFixed(1));
+          yoyGrowthStatus = `${yoyGrowthPct >= 0 ? '+' : ''}${yoyGrowthPct}%`;
+        }
+      }
+
+      return {
+        financialYear: data.financialYear,
+        sales: data.sales,
+        quantity: data.quantity,
+        customers: data.customers.size,
+        products: data.products.size,
+        segments: data.segments.size,
+        transactions: data.transactions,
+        prevSales,
+        yoyGrowthPct,
+        yoyGrowthStatus,
+      };
+    });
+  }, [allRecords, filters]);
+
+  return (
+    <AnalyticsContext.Provider
+      value={{
+        activeView,
+        setActiveView,
+        isLoading,
+        setIsLoading,
+        processingStage,
+        filename,
+        qualitySummary,
+        allRecords,
+        filteredRecords,
+        insights,
+        filters,
+        breadcrumbs,
+        selectedReportingFY,
+        setSelectedReportingFY,
+        reportingPeriodLabel,
+        reportingBounds,
+        outsideReportingPeriodRecords,
+        availableReportingFYs,
+        availableFinancialYears,
+        availableSegments,
+        availableRblProductSegments,
+        availableProducts,
+        availableCustomers,
+        availableCustomerGroups,
+        availableMasterCustomerGroups,
+        availablePlants,
+        availableInvoiceNums,
+        financialYearBreakdown,
+        selectedProduct,
+        setSelectedProduct,
+        selectedCustomer,
+        setSelectedCustomer,
+        compareProducts,
+        setCompareProducts,
+        uploadExcelFile,
+        loadSampleDataset,
+        setFilter,
+        toggleFinancialYearFilter,
+        toggleSegmentFilter,
+        toggleProductFilter,
+        toggleCustomerFilter,
+        togglePlantFilter,
+        toggleInvoiceNumFilter,
+        toggleCustomerGroupFilter,
+        toggleMasterCustomerGroupFilter,
+        toggleRblProductSegmentFilter,
+        clearAllFilters,
+        investigateInsight,
+        popBreadcrumb,
+        resetDataset,
+        theme,
+        setTheme,
+        kpiMetrics,
+        timeTrends,
+        segmentBreakdown,
+        productFamilyBreakdown,
+        plantBreakdown,
+        topProducts,
+        topApplications,
+        topCustomers,
+        quarterlyBreakdown,
+      }}
+    >
+      {children}
+    </AnalyticsContext.Provider>
+  );
+};
+
+export const useAnalytics = () => {
+  const context = useContext(AnalyticsContext);
+  if (!context) {
+    throw new Error('useAnalytics must be used within an AnalyticsProvider');
+  }
+  return context;
+};
